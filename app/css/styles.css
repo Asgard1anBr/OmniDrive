@@ -192,6 +192,8 @@ select.field option{background:#0b1a26;color:#fff;}
 /* ---- modal ---- */
 .modal-back{position:fixed;inset:0;z-index:20;background:rgba(4,8,14,.62);backdrop-filter:blur(3px);
   display:flex;align-items:center;justify-content:center;padding:20px;}
+/* no leitor de QR, o blur faz o vídeo ficar preto em GPUs Android — usa fundo sólido */
+.modal-back.scan{backdrop-filter:none;background:rgba(4,8,14,.92);}
 .modal{width:100%;max-width:380px;background:linear-gradient(180deg,#0f2331,#0b1a26);
   border:1px solid var(--line-cyan);border-radius:16px;padding:20px;
   box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 30px rgba(46,230,224,.1);}

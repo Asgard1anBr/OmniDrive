@@ -16,7 +16,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.0.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '1.0.3', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -199,6 +199,9 @@
         <button type="button" class="btn ghost" id="scan-cancel">Cancelar</button>
         <button type="button" class="btn" id="scan-ir">Ir para o drive</button>
       </div>`);
+    // o backdrop-filter (blur) do modal faz o vídeo renderizar preto em várias GPUs Android;
+    // marca este modal pra desligar o blur (CSS trata pela classe .scan).
+    m.classList.add('scan');
 
     const video = canScan ? m.querySelector('#scan-video') : null;
     let stream = null, raf = null, stopped = false, ultimoAviso = 0;
@@ -249,6 +252,11 @@
         if (stopped) { s.getTracks().forEach(t => t.stop()); return; }
         stream = s; video.srcObject = s;
         try { await video.play(); } catch (e) {}
+        // diagnóstico: em ~1s, confere se está chegando imagem da câmera
+        setTimeout(() => {
+          if (stopped || !video) return;
+          if (!video.videoWidth) status.textContent = 'Câmera aberta mas sem imagem (0×0). Feche outros apps que usam a câmera e reabra.';
+        }, 1200);
         const detector = new BarcodeDetector({ formats: ['qr_code'] });
         const tick = async () => {
           if (stopped) return;
@@ -592,7 +600,7 @@
          <button class="btn ghost" id="sair" style="margin-top:10px">Sair</button>` : '';
     el.innerHTML = `<div class="sobre">
       <img src="icons/omnidrive-icon.png" alt="OmniDrive">
-      <h1>OmniDrive <span class="muted" style="font-size:14px">1.0.2</span></h1>
+      <h1>OmniDrive <span class="muted" style="font-size:14px">1.0.3</span></h1>
       <p>Catálogo pessoal de drives físicos (HDs, SSDs, NVMe, pen drives). Guarda o que existe dentro
       de cada drive e permite buscar por qualquer palavra ou por tipo de arquivo, dizendo em qual drive
       o dado está — sem precisar plugar um por um.</p>
