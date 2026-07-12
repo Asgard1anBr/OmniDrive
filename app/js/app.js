@@ -15,8 +15,14 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '1.2';
+  const VERSAO = '1.3';
   const CHANGELOG = [
+    { v: '1.3', data: '2026-07-12', itens: [
+      'Scrollbars estilizadas (finas, ciano) em todo o app.',
+      'Logo no topo agora é clicável — leva à página inicial.',
+      'Botão "Remover drive" reduzido e posicionado no canto inferior direito.',
+      'Remoção de drive agora exige confirmação por código de 4 caracteres aleatório.'
+    ]},
     { v: '1.2', data: '2026-07-12', itens: [
       'Leitor de QR: vídeo movido para fora da tela com dimensão real (320×240) — Android descartava o elemento de 2px como "não visível", impedindo o play.',
       'Play da câmera com retry automático e diagnóstico visual após 2 segundos.'
@@ -45,7 +51,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '1.3', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -337,17 +343,24 @@
   }
 
   function confirmarRemover(d) {
-    const m = modal(`<h3>Remover drive?</h3>
-      <p class="muted" style="font-size:14px">“${esc(d.nome)}” (${d.id}) será apagado do catálogo.</p>
-      <div class="form-actions">
-        <button type="button" class="btn ghost" id="m-cancel">Cancelar</button>
-        <button type="button" class="btn danger" id="m-del">Remover</button>
+    const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const m = modal(`<h3 style=”color:var(--danger)”>Remover drive?</h3>
+      <p class=”muted” style=”font-size:14px”>Você tem certeza que quer apagar <b style=”color:#fff”>”${esc(d.nome)}”</b> (${d.id})? Não terá como recuperar.</p>
+      <p style=”font-size:13px;color:var(--txt-mid);margin-top:12px”>Para confirmar, digite o código abaixo:</p>
+      <div style=”text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;color:var(--danger);margin:10px 0”>${code}</div>
+      <input class=”field” id=”m-code” placeholder=”Digite o código acima” autocomplete=”off” style=”text-align:center;text-transform:uppercase;letter-spacing:3px”>
+      <div class=”form-actions” style=”margin-top:14px”>
+        <button type=”button” class=”btn ghost” id=”m-cancel”>Cancelar</button>
+        <button type=”button” class=”btn danger” id=”m-del”>Apagar</button>
       </div>`);
     m.querySelector('#m-cancel').onclick = () => m.remove();
     m.querySelector('#m-del').onclick = () => {
+      const typed = (m.querySelector('#m-code').value || '').trim().toUpperCase();
+      if (typed !== code) { toast('Código incorreto.'); m.querySelector('#m-code').focus(); return; }
       const cat = store.load(); cat.drives = cat.drives.filter(x => x.id !== d.id); store.save(cat);
       m.remove(); state.editId = null; toast('Drive removido'); go('busca');
     };
+    m.querySelector('#m-code').addEventListener('keydown', e => { if (e.key === 'Enter') m.querySelector('#m-del').click(); });
   }
 
   // ================= BUSCA =================
@@ -462,7 +475,7 @@
         <button class="btn ghost" id="editar">✎ Editar</button>
         <button class="btn" id="qr">⌗ Gerar QR</button>
       </div>
-      <button class="btn danger" id="remover" style="width:100%;margin-top:10px">Remover drive</button>`;
+      <button class="btn-remove-small" id="remover">Remover drive</button>`;
 
     document.getElementById('back').addEventListener('click', () => go('busca'));
     document.getElementById('editar').addEventListener('click', () => { state.editId = d.id; go('cadastro'); });
@@ -556,7 +569,7 @@
         <button type="button" class="btn ghost" id="cancelar">Cancelar</button>
         <button type="button" class="btn" id="salvar">${editing ? 'Salvar alterações' : 'Salvar drive'}</button>
       </div>
-      ${editing ? `<button type="button" class="btn danger" id="remover" style="width:100%;margin-top:10px">Remover drive</button>` : ''}
+      ${editing ? `<button type="button" class="btn-remove-small" id="remover">Remover drive</button>` : ''}
     </div>`;
 
     // segmentos (clique alterna; clicar de novo desmarca)
@@ -702,6 +715,7 @@
     if (t.dataset.view === 'cadastro') state.editId = null;
     go(t.dataset.view);
   }));
+  document.querySelector('.brand').addEventListener('click', () => { if (state.authed) go('busca'); });
   document.getElementById('btnSobre').addEventListener('click', () => go('sobre'));
   document.getElementById('btnScan').addEventListener('click', () => {
     if (!state.authed) return go('entrar');
