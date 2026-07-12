@@ -33,12 +33,22 @@ drive está e o que mais tem nele, sem plugar um por um. Criado por Davi Torres.
 - Sobe em **http://localhost:5050** (e `http://127.0.0.1:5050`). Sem cache (`no-store`).
 - Abrir no Brave: usar `http://127.0.0.1:5050` (senão o Brave vira `localhost.com`).
 
+## Produção
+- **URL:** https://asgard1anbr.github.io/OmniDrive/
+- **Repo:** https://github.com/Asgard1anBr/OmniDrive (público, branch `main`)
+- **Deploy:** automático via GitHub Actions (`.github/workflows/deploy.yml`) a cada push em `main`, publica o
+  conteúdo de `app/`. Configurado em Settings → Pages → Source = GitHub Actions.
+- **OAuth Google:** origens autorizadas incluem `http://localhost:5050`, `http://127.0.0.1:5050` (dev) e
+  `https://asgard1anbr.github.io` (produção). Client ID em `app/js/config.js`.
+
 ## Status (2026-07-11) — app v1.0
 - ✅ **Fase 1** — Busca (filtro por tipo, destaque, sem acento) + Detalhe (anel de capacidade) + Sobre.
 - ✅ **Fase 2** — Cadastro tela cheia (novo + editar tudo, inclusive tamanho usado), ID auto, capacidade com
   eco/%, "+ Novo Local" em modal, remoção com confirmação, salvar (localStorage por enquanto).
 - ✅ **Fase 3** — QR próprio (`qr.js`): ver código, Copiar, exportar PNG/SVG. Validado (round-trip) e escaneado no celular.
-- ⏳ **Fase 4** (próxima) — **Google Drive** (aguarda o Client ID do setup do Google) + backups + instalar como PWA.
+- ✅ **Fase 4** — Google Drive (login, catálogo JSON, backups rotativos) + Service Worker (PWA instalável) +
+  deploy em produção no GitHub Pages. Testado e funcionando (login, cadastro, sincronização).
+- ⏳ **Pendente** — instalar/testar PWA no celular real (tela inicial), conferir sincronização PC ↔ celular.
 
 ## Armadilhas do ambiente
 - **Screenshot do navegador embutido trava** (culpa do `backdrop-filter`/blur). Verificar via `get_page_text` /

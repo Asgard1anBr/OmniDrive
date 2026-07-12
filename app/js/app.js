@@ -188,6 +188,62 @@
     mo.querySelector('#q-svg').onclick = () => baixar(new Blob([svg], { type: 'image/svg+xml' }), d.id + '.svg');
     mo.querySelector('#q-png').onclick = () => OmniQR.toCanvas(m, 12, 4).toBlob(b => baixar(b, d.id + '.png'), 'image/png');
   }
+  function abrirScanner() {
+    const canScan = 'BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+    const m = modal(`<h3>Ler código do drive</h3>
+      ${canScan ? `<div class="scan-wrap"><video id="scan-video" autoplay playsinline muted></video></div>
+        <div class="muted" id="scan-status" style="font-size:13px;margin-top:8px;text-align:center">Aponte a câmera para o QR code…</div>`
+        : `<p class="muted" style="font-size:14px">Este navegador não lê QR pela câmera. Digite o código impresso na etiqueta:</p>`}
+      <input class="field" id="scan-manual" placeholder="OMNI-XXXXX" style="margin-top:12px;text-transform:uppercase" autocomplete="off">
+      <div class="form-actions" style="margin-top:14px">
+        <button type="button" class="btn ghost" id="scan-cancel">Cancelar</button>
+        <button type="button" class="btn" id="scan-ir">Ir para o drive</button>
+      </div>`);
+
+    let stream = null, raf = null, stopped = false;
+    function stop() {
+      stopped = true;
+      if (raf) cancelAnimationFrame(raf);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+    }
+    const origRemove = m.remove.bind(m);
+    m.remove = () => { stop(); origRemove(); };
+
+    function irPara(codigoBruto) {
+      const codigo = (codigoBruto || '').trim().toUpperCase();
+      if (!codigo) return;
+      const cat = store.load();
+      const d = cat.drives.find(x => x.id === codigo);
+      if (!d) { toast('Nenhum drive com o código ' + codigo); return; }
+      m.remove();
+      state.driveId = d.id; go('detalhe');
+    }
+
+    m.querySelector('#scan-cancel').addEventListener('click', () => m.remove());
+    m.querySelector('#scan-ir').addEventListener('click', () => irPara(m.querySelector('#scan-manual').value));
+    m.querySelector('#scan-manual').addEventListener('keydown', e => { if (e.key === 'Enter') irPara(e.target.value); });
+
+    if (canScan) {
+      const video = m.querySelector('#scan-video'), status = m.querySelector('#scan-status');
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(s => {
+        if (stopped) { s.getTracks().forEach(t => t.stop()); return; }
+        stream = s; video.srcObject = s;
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        const tick = async () => {
+          if (stopped) return;
+          try {
+            const codes = await detector.detect(video);
+            if (codes.length) { status.textContent = 'Código encontrado!'; irPara(codes[0].rawValue); return; }
+          } catch (e) {}
+          raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      }).catch(() => { status.textContent = 'Não foi possível acessar a câmera — digite o código abaixo.'; m.querySelector('#scan-manual').focus(); });
+    } else {
+      m.querySelector('#scan-manual').focus();
+    }
+  }
+
   function confirmarRemover(d) {
     const m = modal(`<h3>Remover drive?</h3>
       <p class="muted" style="font-size:14px">“${esc(d.nome)}” (${d.id}) será apagado do catálogo.</p>
@@ -532,12 +588,16 @@
     else if (state.view === 'cadastro') renderCadastro(cat, state.editId ? cat.drives.find(d => d.id === state.editId) : null);
   }
 
-  document.querySelectorAll('.navbtn').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.navbtn[data-view]').forEach(t => t.addEventListener('click', () => {
     if (!state.authed) return go('entrar');
     if (t.dataset.view === 'cadastro') state.editId = null;
     go(t.dataset.view);
   }));
   document.getElementById('btnSobre').addEventListener('click', () => go('sobre'));
+  document.getElementById('btnScan').addEventListener('click', () => {
+    if (!state.authed) return go('entrar');
+    abrirScanner();
+  });
 
   state.view = 'entrar';
   render();
