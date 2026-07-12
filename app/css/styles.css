@@ -64,7 +64,7 @@ main{position:relative;z-index:1;flex:1;width:100%;max-width:var(--maxw);margin:
 /* texto digitado sempre branco (melhora contraste sobre o fundo) */
 input, textarea, select{color:#fff;}
 input::placeholder, textarea::placeholder{color:#8aa0b0;}
-input[type="date"]{color-scheme:dark;}
+input[type="date"],input[type="number"],select{color-scheme:dark;}
 input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(2);}
 .filter-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
 .fpill{font-size:13px;padding:6px 13px;border-radius:20px;border:1px solid rgba(120,160,180,.24);
