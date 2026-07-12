@@ -16,7 +16,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.0.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '1.0.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -237,7 +237,15 @@
 
     if (canScan) {
       const status = m.querySelector('#scan-status');
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(async s => {
+      // tenta a câmera traseira; se o aparelho recusar, cai pra qualquer câmera disponível
+      const abrirCamera = async () => {
+        try { return await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } }); }
+        catch (e1) {
+          try { return await navigator.mediaDevices.getUserMedia({ video: true }); }
+          catch (e2) { throw (e2 && e2.name ? e2 : e1); }
+        }
+      };
+      abrirCamera().then(async s => {
         if (stopped) { s.getTracks().forEach(t => t.stop()); return; }
         stream = s; video.srcObject = s;
         try { await video.play(); } catch (e) {}
@@ -252,7 +260,17 @@
           if (!stopped) raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
-      }).catch(() => { status.textContent = 'Não foi possível acessar a câmera — digite o código abaixo.'; m.querySelector('#scan-manual').focus(); });
+      }).catch((e) => {
+        const motivo = {
+          NotAllowedError: 'permissão negada',
+          NotReadableError: 'câmera ocupada por outro app',
+          NotFoundError: 'nenhuma câmera encontrada',
+          OverconstrainedError: 'câmera incompatível',
+          SecurityError: 'bloqueada (precisa de HTTPS)'
+        }[e && e.name] || (e && e.name) || 'erro desconhecido';
+        status.textContent = 'Câmera indisponível (' + motivo + ') — digite o código abaixo.';
+        m.querySelector('#scan-manual').focus();
+      });
     } else {
       m.querySelector('#scan-manual').focus();
     }
@@ -574,7 +592,7 @@
          <button class="btn ghost" id="sair" style="margin-top:10px">Sair</button>` : '';
     el.innerHTML = `<div class="sobre">
       <img src="icons/omnidrive-icon.png" alt="OmniDrive">
-      <h1>OmniDrive <span class="muted" style="font-size:14px">1.0.1</span></h1>
+      <h1>OmniDrive <span class="muted" style="font-size:14px">1.0.2</span></h1>
       <p>Catálogo pessoal de drives físicos (HDs, SSDs, NVMe, pen drives). Guarda o que existe dentro
       de cada drive e permite buscar por qualquer palavra ou por tipo de arquivo, dizendo em qual drive
       o dado está — sem precisar plugar um por um.</p>
