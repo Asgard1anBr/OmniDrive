@@ -7,6 +7,7 @@
   // ---------- rótulos dos enums ----------
   const LABELS = {
     tipo: { HD: 'HD', SSD: 'SSD', NVMe: 'NVMe', PenDrive: 'Pen drive' },
+    tamanho: { '2.5': '2,5"', '3.5': '3,5"', outro: 'Outro' },
     acondicionamento: { solto: 'Solto', case: 'Em case' },
     criptografia: { nao: 'Não', sim: 'Sim', hibrido: 'Híbrido' },
     estado: { em_uso: 'Em uso', disponivel: 'Disponível', cheio: 'Cheio', aposentado: 'Aposentado', defeito: 'Com defeito' },
@@ -15,8 +16,14 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '1.3.3';
+  const VERSAO = '1.4';
   const CHANGELOG = [
+    { v: '1.4', data: '2026-07-12', itens: [
+      'Novo campo: Tamanho físico (2,5", 3,5", Outro).',
+      'Novo campo: Marca e Modelo.',
+      'Novo campo: Número de série (S/N).',
+      'Busca agora inclui marca, modelo e número de série.'
+    ]},
     { v: '1.3.3', data: '2026-07-12', itens: [
       'Spinner de número e select com tema escuro (não mais cinza).'
     ]},
@@ -61,7 +68,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.3.3', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '1.4', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -379,7 +386,7 @@
     return cat.drives.filter(d => {
       if (state.filtro && !(d.tiposArquivo || []).includes(state.filtro)) return false;
       if (!q) return true;
-      const alvo = norm([d.nome, d.id, d.conteudo, (d.tags || []).join(' ')].join(' '));
+      const alvo = norm([d.nome, d.id, d.conteudo, d.marca, d.modelo, d.serial, (d.tags || []).join(' ')].join(' '));
       return alvo.includes(q);
     });
   }
@@ -457,6 +464,10 @@
     const chip = (rot, val) => val ? `<span class="chip"><i>${rot}</i>${esc(val)}</span>` : '';
     const chips = [
       chip('Tipo', LABELS.tipo[d.tipo]),
+      chip('Tamanho', LABELS.tamanho && LABELS.tamanho[d.tamanho]),
+      chip('Marca', d.marca),
+      chip('Modelo', d.modelo),
+      chip('S/N', d.serial),
       chip('Conexão', d.conexao),
       chip('Cripto', LABELS.criptografia[d.criptografia]),
       d.particoes ? chip('Partições', String(d.particoes)) : '',
@@ -514,6 +525,23 @@
 
       <label class="flabel">Tipo</label>
       ${segHtml('f-tipo', LABELS.tipo, d.tipo)}
+
+      <label class="flabel">Tamanho <em>opcional</em></label>
+      ${segHtml('f-tamanho', LABELS.tamanho, d.tamanho)}
+
+      <div class="row">
+        <div class="col">
+          <label class="flabel">Marca <em>opcional</em></label>
+          <input class="field" id="f-marca" value="${esc(d.marca || '')}" placeholder="Samsung, WD…" autocomplete="off">
+        </div>
+        <div class="col">
+          <label class="flabel">Modelo <em>opcional</em></label>
+          <input class="field" id="f-modelo" value="${esc(d.modelo || '')}" placeholder="T7 Shield…" autocomplete="off">
+        </div>
+      </div>
+
+      <label class="flabel">Nº de série <em>opcional</em></label>
+      <input class="field" id="f-serial" value="${esc(d.serial || '')}" placeholder="S/N do dispositivo" autocomplete="off">
 
       <div class="row">
         <div class="col">
@@ -618,6 +646,10 @@
       const alvo = editing ? cat2.drives.find(x => x.id === id) : { id, criadoEm: new Date().toISOString() };
       alvo.id = id; alvo.nome = nome;
       alvo.tipo = segVal('f-tipo') || null;
+      alvo.tamanho = segVal('f-tamanho') || null;
+      alvo.marca = el.querySelector('#f-marca').value.trim() || null;
+      alvo.modelo = el.querySelector('#f-modelo').value.trim() || null;
+      alvo.serial = el.querySelector('#f-serial').value.trim() || null;
       alvo.acondicionamento = segVal('f-acond') || null;
       alvo.conexao = el.querySelector('#f-conexao').value.trim() || null;
       alvo.capacidadeGB = parseCapacity(el.querySelector('#f-cap').value);
