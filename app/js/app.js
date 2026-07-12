@@ -15,8 +15,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '1.1';
+  const VERSAO = '1.2';
   const CHANGELOG = [
+    { v: '1.2', data: '2026-07-12', itens: [
+      'Leitor de QR: vídeo movido para fora da tela com dimensão real (320×240) — Android descartava o elemento de 2px como "não visível", impedindo o play.',
+      'Play da câmera com retry automático e diagnóstico visual após 2 segundos.'
+    ]},
     { v: '1.1', data: '2026-07-12', itens: [
       'Leitor de QR: conserto definitivo da tela preta — os frames da câmera agora são desenhados num canvas (o elemento de vídeo renderizava preto em várias GPUs Android).',
       'Nova tela "Histórico de Versões", acessível pelo Sobre.'
@@ -41,7 +45,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '1.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -217,7 +221,7 @@
     const canScan = 'BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
     const m = modal(`<h3>Ler código do drive</h3>
       ${canScan ? `<div class="scan-wrap">
-          <video id="scan-video" autoplay playsinline muted style="position:absolute;width:2px;height:2px;opacity:0;pointer-events:none"></video>
+          <video id="scan-video" autoplay playsinline muted style="position:fixed;left:-9999px;top:0;width:320px;height:240px;opacity:.01;pointer-events:none"></video>
           <canvas id="scan-canvas"></canvas>
         </div>
         <div class="muted" id="scan-status" style="font-size:13px;margin-top:8px;text-align:center">Aponte a câmera para o QR code…</div>`
@@ -279,16 +283,25 @@
       abrirCamera().then(async s => {
         if (stopped) { s.getTracks().forEach(t => t.stop()); return; }
         stream = s; video.srcObject = s;
-        try { await video.play(); } catch (e) {}
-        // o <video> renderiza preto em muitas GPUs Android (bug de compositing);
-        // por isso exibimos os frames desenhando num <canvas> — e detectamos a partir dele.
+        const playVideo = async () => {
+          try { await video.play(); } catch (_) {
+            await new Promise(r => setTimeout(r, 500));
+            try { await video.play(); } catch (_2) {}
+          }
+        };
+        await playVideo();
         const canvas = m.querySelector('#scan-canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        // diagnóstico: em ~1,2s, confere se está chegando imagem da câmera
         setTimeout(() => {
           if (stopped || !video) return;
           if (!video.videoWidth) status.textContent = 'Câmera aberta mas sem imagem (0×0). Feche outros apps que usam a câmera e reabra.';
-        }, 1200);
+          else {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const px = ctx.getImageData(0, 0, 1, 1).data;
+            if (px[0] === 0 && px[1] === 0 && px[2] === 0) status.textContent = 'Câmera ativa (' + video.videoWidth + '×' + video.videoHeight + ') — se a imagem estiver preta, feche e reabra.';
+          }
+        }, 2000);
         const detector = new BarcodeDetector({ formats: ['qr_code'] });
         let detectando = false;
         const tick = () => {
