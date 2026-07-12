@@ -300,4 +300,16 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
   Verificado nesta sessão: script do Google, `OmniCloud`, guard de navegação sem login, modo local, Sair.
   **Pendente de verificação pelo Davi** (login real com conta Google não pode ser testado neste ambiente):
   login efetivo, criação do arquivo no Drive, leitura/gravação, pasta de backups.
-- Instalação como PWA (ícone na tela inicial) — pendente.
+- **Fase 5** ✅ (2026-07-11) — produção. Login Google testado e funcionando (arquivo `omnidrive-catalogo.json`
+  criado no Drive + pasta de backups confirmada). **Service Worker** (`app/sw.js`) → PWA instalável.
+  **Leitura de QR pela câmera** (`abrirScanner`, terceiro botão "Ler QR"): BarcodeDetector nativo com fallback
+  de digitação manual; leva direto ao Detalhe do drive. Deploy no **GitHub Pages** via GitHub Actions
+  (`.github/workflows/deploy.yml`), repo público `Asgard1anBr/OmniDrive`, URL de produção
+  https://asgard1anbr.github.io/OmniDrive/. Origem adicionada no OAuth. Ícone **maskable** dedicado
+  (`omnidrive-icon-maskable.png`) para não cortar no Android.
+
+#### Correções pós-lançamento
+- **v1.0.1** (2026-07-12) — **câmera do QR**: (1) liberação robusta ao fechar (para trilhas + `video.srcObject=null`
+  + `pause()`) — antes a 2ª abertura vinha preta porque a câmera não era solta; (2) `video.play()` explícito na
+  abertura; (3) scanner segue lendo após um código desconhecido (antes congelava) + anti-spam do toast (2,5s).
+  SW cache `v3→v4`. Também: SW passou a **rede-primeiro para HTML** (corrige versão presa no cache após deploy).

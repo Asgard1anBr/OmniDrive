@@ -16,7 +16,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '1.0.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -200,23 +200,35 @@
         <button type="button" class="btn" id="scan-ir">Ir para o drive</button>
       </div>`);
 
-    let stream = null, raf = null, stopped = false;
+    const video = canScan ? m.querySelector('#scan-video') : null;
+    let stream = null, raf = null, stopped = false, ultimoAviso = 0;
     function stop() {
       stopped = true;
       if (raf) cancelAnimationFrame(raf);
-      if (stream) stream.getTracks().forEach(t => t.stop());
+      raf = null;
+      // solta a câmera por completo: para as trilhas E desliga do elemento de vídeo
+      // (sem limpar o srcObject, alguns navegadores no celular seguram a câmera e a
+      //  próxima abertura vem preta).
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      if (video) { try { video.pause(); } catch (e) {} video.srcObject = null; }
     }
     const origRemove = m.remove.bind(m);
     m.remove = () => { stop(); origRemove(); };
 
+    // resolve o código; retorna true se achou o drive (e fechou), false se não achou
     function irPara(codigoBruto) {
       const codigo = (codigoBruto || '').trim().toUpperCase();
-      if (!codigo) return;
+      if (!codigo) return false;
       const cat = store.load();
       const d = cat.drives.find(x => x.id === codigo);
-      if (!d) { toast('Nenhum drive com o código ' + codigo); return; }
+      if (!d) {
+        // evita spam de toast quando a câmera relê o mesmo código inválido a cada frame
+        if (Date.now() - ultimoAviso > 2500) { toast('Nenhum drive com o código ' + codigo); ultimoAviso = Date.now(); }
+        return false;
+      }
       m.remove();
       state.driveId = d.id; go('detalhe');
+      return true;
     }
 
     m.querySelector('#scan-cancel').addEventListener('click', () => m.remove());
@@ -224,18 +236,20 @@
     m.querySelector('#scan-manual').addEventListener('keydown', e => { if (e.key === 'Enter') irPara(e.target.value); });
 
     if (canScan) {
-      const video = m.querySelector('#scan-video'), status = m.querySelector('#scan-status');
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(s => {
+      const status = m.querySelector('#scan-status');
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(async s => {
         if (stopped) { s.getTracks().forEach(t => t.stop()); return; }
         stream = s; video.srcObject = s;
+        try { await video.play(); } catch (e) {}
         const detector = new BarcodeDetector({ formats: ['qr_code'] });
         const tick = async () => {
           if (stopped) return;
           try {
             const codes = await detector.detect(video);
-            if (codes.length) { status.textContent = 'Código encontrado!'; irPara(codes[0].rawValue); return; }
+            // se achou um código válido, irPara fecha tudo; se não, segue lendo
+            if (codes.length && irPara(codes[0].rawValue)) return;
           } catch (e) {}
-          raf = requestAnimationFrame(tick);
+          if (!stopped) raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
       }).catch(() => { status.textContent = 'Não foi possível acessar a câmera — digite o código abaixo.'; m.querySelector('#scan-manual').focus(); });
@@ -560,7 +574,7 @@
          <button class="btn ghost" id="sair" style="margin-top:10px">Sair</button>` : '';
     el.innerHTML = `<div class="sobre">
       <img src="icons/omnidrive-icon.png" alt="OmniDrive">
-      <h1>OmniDrive <span class="muted" style="font-size:14px">1.0</span></h1>
+      <h1>OmniDrive <span class="muted" style="font-size:14px">1.0.1</span></h1>
       <p>Catálogo pessoal de drives físicos (HDs, SSDs, NVMe, pen drives). Guarda o que existe dentro
       de cada drive e permite buscar por qualquer palavra ou por tipo de arquivo, dizendo em qual drive
       o dado está — sem precisar plugar um por um.</p>
