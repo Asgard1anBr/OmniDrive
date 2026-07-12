@@ -1,4 +1,4 @@
-const CACHE = 'omnidrive-v9';
+const CACHE = 'omnidrive-v10';
 const SHELL = [
   './',
   'index.html',
@@ -32,32 +32,12 @@ self.addEventListener('fetch', e => {
 
   if (url.origin !== location.origin) return;
 
-  // HTML / navegação: rede primeiro (sempre a versão mais nova), cache só como reserva offline.
-  const isHTML = req.mode === 'navigate' ||
-    (req.headers.get('accept') || '').includes('text/html');
-
-  if (isHTML) {
-    e.respondWith(
-      fetch(req).then(r => {
-        const clone = r.clone();
-        caches.open(CACHE).then(c => c.put(req, clone));
-        return r;
-      }).catch(() => caches.match(req).then(c => c || caches.match('index.html')))
-    );
-    return;
-  }
-
-  // Demais recursos (css/js/imagens): cache primeiro, atualizando em segundo plano.
+  // Tudo network-first: sempre busca a versão mais nova, cache só como reserva offline.
   e.respondWith(
-    caches.match(req).then(cached => {
-      const net = fetch(req).then(r => {
-        if (r.ok) {
-          const clone = r.clone();
-          caches.open(CACHE).then(c => c.put(req, clone));
-        }
-        return r;
-      }).catch(() => cached);
-      return cached || net;
-    })
+    fetch(req).then(r => {
+      const clone = r.clone();
+      caches.open(CACHE).then(c => c.put(req, clone));
+      return r;
+    }).catch(() => caches.match(req).then(c => c || caches.match('index.html')))
   );
 });
