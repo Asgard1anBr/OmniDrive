@@ -14,9 +14,34 @@
   };
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
+  // ---------- versão e histórico ----------
+  const VERSAO = '1.1';
+  const CHANGELOG = [
+    { v: '1.1', data: '2026-07-12', itens: [
+      'Leitor de QR: conserto definitivo da tela preta — os frames da câmera agora são desenhados num canvas (o elemento de vídeo renderizava preto em várias GPUs Android).',
+      'Nova tela "Histórico de Versões", acessível pelo Sobre.'
+    ]},
+    { v: '1.0.3', data: '2026-07-12', itens: [
+      'Leitor de QR: fundo do modal sem desfoque (blur causava vídeo preto em alguns aparelhos).',
+      'Diagnóstico na tela quando a câmera abre mas não entrega imagem.'
+    ]},
+    { v: '1.0.2', data: '2026-07-12', itens: [
+      'Leitor de QR: se a câmera traseira falhar, tenta qualquer câmera disponível.',
+      'Mensagem de erro da câmera passou a dizer o motivo real (permissão negada, câmera ocupada etc.).'
+    ]},
+    { v: '1.0.1', data: '2026-07-12', itens: [
+      'Leitor de QR: câmera é liberada por completo ao fechar (a 2ª abertura vinha preta).',
+      'Scanner continua lendo após um código desconhecido (antes travava).',
+      'Atualizações do app passam a chegar na hora (correção do cache do Service Worker).'
+    ]},
+    { v: '1.0', data: '2026-07-11', itens: [
+      'Lançamento: busca por palavra e tipo de arquivo, cadastro completo, detalhe com anel de capacidade, geração de QR com exportação PNG/SVG, leitura de QR pela câmera, login Google com catálogo no seu Drive, backups automáticos, PWA instalável e publicação em produção.'
+    ]}
+  ];
+
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.0.3', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '1.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -191,7 +216,10 @@
   function abrirScanner() {
     const canScan = 'BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
     const m = modal(`<h3>Ler código do drive</h3>
-      ${canScan ? `<div class="scan-wrap"><video id="scan-video" autoplay playsinline muted></video></div>
+      ${canScan ? `<div class="scan-wrap">
+          <video id="scan-video" autoplay playsinline muted style="position:absolute;width:2px;height:2px;opacity:0;pointer-events:none"></video>
+          <canvas id="scan-canvas"></canvas>
+        </div>
         <div class="muted" id="scan-status" style="font-size:13px;margin-top:8px;text-align:center">Aponte a câmera para o QR code…</div>`
         : `<p class="muted" style="font-size:14px">Este navegador não lê QR pela câmera. Digite o código impresso na etiqueta:</p>`}
       <input class="field" id="scan-manual" placeholder="OMNI-XXXXX" style="margin-top:12px;text-transform:uppercase" autocomplete="off">
@@ -252,19 +280,30 @@
         if (stopped) { s.getTracks().forEach(t => t.stop()); return; }
         stream = s; video.srcObject = s;
         try { await video.play(); } catch (e) {}
-        // diagnóstico: em ~1s, confere se está chegando imagem da câmera
+        // o <video> renderiza preto em muitas GPUs Android (bug de compositing);
+        // por isso exibimos os frames desenhando num <canvas> — e detectamos a partir dele.
+        const canvas = m.querySelector('#scan-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        // diagnóstico: em ~1,2s, confere se está chegando imagem da câmera
         setTimeout(() => {
           if (stopped || !video) return;
           if (!video.videoWidth) status.textContent = 'Câmera aberta mas sem imagem (0×0). Feche outros apps que usam a câmera e reabra.';
         }, 1200);
         const detector = new BarcodeDetector({ formats: ['qr_code'] });
-        const tick = async () => {
+        let detectando = false;
+        const tick = () => {
           if (stopped) return;
-          try {
-            const codes = await detector.detect(video);
-            // se achou um código válido, irPara fecha tudo; se não, segue lendo
-            if (codes.length && irPara(codes[0].rawValue)) return;
-          } catch (e) {}
+          if (video.videoWidth) {
+            if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+            ctx.drawImage(video, 0, 0);
+            if (!detectando) {
+              detectando = true;
+              detector.detect(canvas).then(codes => {
+                detectando = false;
+                if (!stopped && codes.length) irPara(codes[0].rawValue);
+              }).catch(() => { detectando = false; });
+            }
+          }
           if (!stopped) raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
@@ -600,13 +639,15 @@
          <button class="btn ghost" id="sair" style="margin-top:10px">Sair</button>` : '';
     el.innerHTML = `<div class="sobre">
       <img src="icons/omnidrive-icon.png" alt="OmniDrive">
-      <h1>OmniDrive <span class="muted" style="font-size:14px">1.0.3</span></h1>
+      <h1>OmniDrive <span class="muted" style="font-size:14px">${VERSAO}</span></h1>
       <p>Catálogo pessoal de drives físicos (HDs, SSDs, NVMe, pen drives). Guarda o que existe dentro
       de cada drive e permite buscar por qualquer palavra ou por tipo de arquivo, dizendo em qual drive
       o dado está — sem precisar plugar um por um.</p>
       <div class="by">Criado por <b>Davi Torres</b></div>
       ${acctLine}
+      <button class="btn ghost" id="ver-versoes" style="margin-top:14px">Histórico de Versões</button>
     </div>`;
+    document.getElementById('ver-versoes').addEventListener('click', () => go('versoes'));
     const sair = document.getElementById('sair');
     if (sair) sair.addEventListener('click', () => {
       if (mode === 'cloud') OmniCloud.signOut();
@@ -615,12 +656,27 @@
     });
   }
 
+  // ================= HISTÓRICO DE VERSÕES =================
+  function renderVersoes() {
+    const blocos = CHANGELOG.map(c => `
+      <div class="ver-bloco">
+        <div class="ver-head"><b>v${c.v}</b><span class="muted">${c.data.split('-').reverse().join('/')}</span></div>
+        <ul class="ver-lista">${c.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+      </div>`).join('');
+    el.innerHTML = `
+      <button class="back" id="back">‹ Voltar</button>
+      <div class="screen-label">Histórico de Versões</div>
+      ${blocos}`;
+    document.getElementById('back').addEventListener('click', () => go('sobre'));
+  }
+
   // ---------- navegação ----------
   function go(view) { state.view = view; render(); }
   function render() {
     document.querySelectorAll('.navbtn').forEach(t =>
       t.classList.toggle('active', t.dataset.view === state.view || (state.view === 'detalhe' && t.dataset.view === 'busca')));
     if (state.view === 'sobre') return renderSobre();
+    if (state.view === 'versoes') return renderVersoes();
     if (!state.authed || state.view === 'entrar') return renderEntrar();
     const cat = store.load();
     if (state.view === 'busca') renderBusca(cat);

@@ -210,7 +210,17 @@ select.field option{background:#0b1a26;color:#fff;}
 .qr-id{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:12px;}
 .qr-id span{font-size:17px;letter-spacing:1.5px;color:var(--cyan-lt);font-weight:700;}
 
+/* ---- histórico de versões ---- */
+.ver-bloco{background:linear-gradient(180deg,rgba(18,34,47,.85),rgba(11,26,38,.85));
+  border:1px solid var(--line-cyan);border-radius:14px;padding:14px 16px;margin-bottom:12px;}
+.ver-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;}
+.ver-head b{color:var(--cyan-lt);font-size:16px;letter-spacing:.5px;}
+.ver-head .muted{font-size:12px;}
+.ver-lista{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;}
+.ver-lista li{font-size:13px;line-height:1.5;color:#cfe3ee;}
+
 /* ---- modal de leitura de QR ---- */
 .scan-wrap{position:relative;width:100%;aspect-ratio:1/1;border-radius:12px;overflow:hidden;
   background:#000;border:1px solid var(--line-cyan);box-shadow:0 0 24px rgba(46,230,224,.2);}
 .scan-wrap video{width:100%;height:100%;object-fit:cover;display:block;}
+.scan-wrap canvas{width:100%;height:100%;object-fit:cover;display:block;}

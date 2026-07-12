@@ -10,9 +10,10 @@ Contexto permanente do projeto. Lido automaticamente toda sessão. Fica na raiz 
 5. **Ao concluir algo relevante, atualize** `docs/OmniDrive.md` (visão, decisões, "Registro de build", histórico de versões).
 6. Sempre prever **breakpoints** (celular ≤600 / tablet 601–1024 / PC ≥1025) e **texto digitado branco**.
 7. **Incremente a versão a cada modificação**, mesmo pequena (SemVer): correção/pequeno ajuste → +patch (1.0.1),
-   funcionalidade nova → +minor (1.1). Bater a versão em **3 lugares**: `app/index.html` (`#appVer`),
-   tela "Sobre" em `app/js/app.js`, e `SEED.appVersion`. Em qualquer mudança de arquivo cacheado, **bump também
-   o `CACHE` do `app/sw.js`** (senão o usuário fica com a versão velha presa no cache).
+   funcionalidade nova → +minor (1.1). Bater em: `app/index.html` (`#appVer`), e em `app/js/app.js` a constante
+   `VERSAO` (alimenta o Sobre), `SEED.appVersion` e **uma entrada nova no `CHANGELOG`** (alimenta a tela
+   "Histórico de Versões", em linguagem de usuário, pt-BR). Em qualquer mudança de arquivo cacheado, **bump
+   também o `CACHE` do `app/sw.js`** (senão o usuário fica com a versão velha presa no cache).
 
 ## O que é
 Catálogo pessoal dos drives físicos do Davi (dezenas de HD/SSD/NVMe/pen drive), cada um com etiqueta.

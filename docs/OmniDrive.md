@@ -313,3 +313,12 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
   + `pause()`) — antes a 2ª abertura vinha preta porque a câmera não era solta; (2) `video.play()` explícito na
   abertura; (3) scanner segue lendo após um código desconhecido (antes congelava) + anti-spam do toast (2,5s).
   SW cache `v3→v4`. Também: SW passou a **rede-primeiro para HTML** (corrige versão presa no cache após deploy).
+- **v1.0.2** (2026-07-12) — câmera: fallback traseira→qualquer câmera; mensagem de erro com motivo real
+  (permissão/ocupada/sem câmera/etc.). SW `v4→v5`. Tela preta persistiu.
+- **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
+  `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
+  `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v1.1** (2026-07-12) — **conserto definitivo da câmera**: frames desenhados em `<canvas>` via `drawImage`
+  (o `<video>` fica oculto de 2px, só como fonte); `BarcodeDetector.detect(canvas)`. Nova tela **Histórico de
+  Versões** (botão no Sobre): constante `VERSAO` + array `CHANGELOG` em `app.js` alimentam Sobre e a tela;
+  regra de versionamento atualizada no CLAUDE.md (bump inclui entrada no CHANGELOG). SW `v6→v7`.
