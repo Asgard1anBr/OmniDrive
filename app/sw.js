@@ -1,4 +1,4 @@
-const CACHE = 'omnidrive-v1';
+const CACHE = 'omnidrive-v2';
 const SHELL = [
   './',
   'index.html',
@@ -8,6 +8,7 @@ const SHELL = [
   'js/qr.js',
   'js/app.js',
   'icons/omnidrive-icon.png',
+  'icons/omnidrive-icon-maskable.png',
   'backgrounds/bg-pc.png',
   'backgrounds/bg-mobile.png',
   'manifest.webmanifest'
