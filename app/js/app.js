@@ -15,8 +15,11 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '1.3.1';
+  const VERSAO = '1.3.2';
   const CHANGELOG = [
+    { v: '1.3.2', data: '2026-07-12', itens: [
+      'Ícone do calendário branco (color-scheme dark + filtro reforçado).'
+    ]},
     { v: '1.3.1', data: '2026-07-12', itens: [
       'Service Worker agora busca sempre a versão mais nova (corrige cache preso).',
       'Ícone do calendário agora aparece branco.'
@@ -55,7 +58,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.3.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '1.3.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
