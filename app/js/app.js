@@ -16,8 +16,16 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '1.4';
+  const VERSAO = '2.0';
   const CHANGELOG = [
+    { v: '2.0', data: '2026-07-13', itens: [
+      'Novo: Painel (Dashboard) com estatísticas, distribuição por tipo e local, drives mais cheios.',
+      'Novo: Dicas de reorganização — sugestões para consolidar ou reorganizar drives.',
+      'Novo: Modo Galeria — cards visuais com ícone do tipo de drive.',
+      'Novo: Agrupamento por local na busca.',
+      'Novo: Sugestão automática de tags ao digitar conteúdo no cadastro.',
+      'Ícone visual do tipo nos cards de busca e localização com 📍.'
+    ]},
     { v: '1.4', data: '2026-07-12', itens: [
       'Novo campo: Tamanho físico (2,5", 3,5", Outro).',
       'Novo campo: Marca e Modelo.',
@@ -68,7 +76,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '1.4', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -158,7 +166,8 @@
   }
 
   // ---------- estado ----------
-  const state = { view: 'entrar', query: '', filtro: null, driveId: null, editId: null, authed: false };
+  const state = { view: 'entrar', query: '', filtro: null, driveId: null, editId: null, authed: false, galeria: false, agrupar: false };
+  const DRIVE_ICON = { HD: '💿', SSD: '⚡', NVMe: '🔥', PenDrive: '🔌' };
 
   // ---------- geração de ID + helpers de UI ----------
   function gerarId(cat) {
@@ -380,6 +389,93 @@
     m.querySelector('#m-code').addEventListener('keydown', e => { if (e.key === 'Enter') m.querySelector('#m-del').click(); });
   }
 
+  // ================= DASHBOARD =================
+  function renderDashboard(cat) {
+    const drives = cat.drives;
+    const total = drives.length;
+    const capTotal = drives.reduce((s, d) => s + (d.capacidadeGB || 0), 0);
+    const usadoTotal = drives.reduce((s, d) => s + (d.usadoGB || 0), 0);
+    const avgPct = capTotal ? Math.round((usadoTotal / capTotal) * 100) : 0;
+
+    // distribuição por tipo
+    const porTipo = {};
+    Object.keys(LABELS.tipo).forEach(t => porTipo[t] = 0);
+    drives.forEach(d => { if (d.tipo && porTipo[d.tipo] !== undefined) porTipo[d.tipo]++; });
+    const maxTipo = Math.max(1, ...Object.values(porTipo));
+    const tiposBars = Object.entries(porTipo).map(([t, n]) =>
+      `<div class="dash-bar-row">
+        <span class="dash-bar-label">${DRIVE_ICON[t] || ''} ${LABELS.tipo[t]}</span>
+        <span class="dash-bar"><i style="width:${(n / maxTipo * 100).toFixed(0)}%;background:var(--cyan)"></i></span>
+        <span class="dash-bar-count">${n}</span>
+      </div>`).join('');
+
+    // top 5 mais cheios
+    const comUso = drives.filter(d => usoPct(d) != null).sort((a, b) => usoPct(b) - usoPct(a)).slice(0, 5);
+    const topHtml = comUso.map(d => {
+      const pct = usoPct(d);
+      return `<div class="dash-top-item" data-id="${d.id}">
+        <span style="font-size:18px">${DRIVE_ICON[d.tipo] || '💾'}</span>
+        <span class="dash-top-name">${esc(d.nome)}</span>
+        <span class="dash-top-bar"><i style="width:${pct}%;background:${pctColor(pct)}"></i></span>
+        <span class="dash-top-pct" style="color:${pctColor(pct)}">${pct}%</span>
+      </div>`;
+    }).join('') || '<div class="muted" style="font-size:13px">Nenhum drive com dados de uso.</div>';
+
+    // dicas de reorganização
+    const tips = [];
+    const subutilizados = drives.filter(d => usoPct(d) != null && usoPct(d) < 20);
+    if (subutilizados.length >= 2) {
+      const nomes = subutilizados.slice(0, 3).map(d => d.nome).join(', ');
+      const capLivre = subutilizados.reduce((s, d) => s + (d.capacidadeGB || 0) - (d.usadoGB || 0), 0);
+      tips.push(`<b>💡 Consolidação possível:</b> ${subutilizados.length} drives com menos de 20% de uso (${nomes}). Juntos liberam ${fmtGB(capLivre)}.`);
+    }
+    const cheios = drives.filter(d => usoPct(d) != null && usoPct(d) >= 90);
+    if (cheios.length) {
+      tips.push(`<b>⚠️ ${cheios.length} drive(s) acima de 90%:</b> ${cheios.map(d => d.nome).join(', ')}. Considere fazer backup ou migrar dados.`);
+    }
+    const semLocal = drives.filter(d => !d.local);
+    if (semLocal.length) {
+      tips.push(`<b>📍 ${semLocal.length} drive(s) sem local definido.</b> Saber onde cada drive está guardado facilita encontrá-los.`);
+    }
+    const tipsHtml = tips.map(t => `<div class="dash-tip">${t}</div>`).join('');
+
+    // drives por local
+    const porLocal = {};
+    drives.forEach(d => { const loc = d.local || 'Sem local'; if (!porLocal[loc]) porLocal[loc] = 0; porLocal[loc]++; });
+    const locaisHtml = Object.entries(porLocal).sort((a, b) => b[1] - a[1]).map(([loc, n]) =>
+      `<div class="dash-bar-row">
+        <span class="dash-bar-label">${esc(loc)}</span>
+        <span class="dash-bar"><i style="width:${(n / total * 100).toFixed(0)}%;background:var(--blue)"></i></span>
+        <span class="dash-bar-count">${n}</span>
+      </div>`).join('');
+
+    el.innerHTML = `
+      <div class="screen-label">Painel</div>
+      <div class="dash-stats">
+        <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-label">Drives</div></div>
+        <div class="stat-card"><div class="stat-val">${fmtGB(capTotal)}</div><div class="stat-label">Capacidade</div></div>
+        <div class="stat-card"><div class="stat-val">${fmtGB(usadoTotal)}</div><div class="stat-label">Usado</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:${pctColor(avgPct)}">${avgPct}%</div><div class="stat-label">Média de uso</div></div>
+      </div>
+      ${tipsHtml ? `<div class="dash-section">${tipsHtml}</div>` : ''}
+      <div class="dash-section">
+        <div class="hint">Distribuição por tipo</div>
+        ${tiposBars}
+      </div>
+      <div class="dash-section">
+        <div class="hint">Por local</div>
+        ${locaisHtml}
+      </div>
+      <div class="dash-section">
+        <div class="hint">Mais cheios</div>
+        <div class="dash-top">${topHtml}</div>
+      </div>`;
+
+    el.querySelectorAll('.dash-top-item').forEach(item => item.addEventListener('click', () => {
+      state.driveId = item.dataset.id; go('detalhe');
+    }));
+  }
+
   // ================= BUSCA =================
   function buscar(cat) {
     const q = norm(state.query);
@@ -405,30 +501,60 @@
     return html;
   }
 
+  function cardHtml(d, gallery) {
+    const pct = usoPct(d);
+    if (gallery) {
+      const bar = pct == null ? '' :
+        `<div class="meta"><span class="bar"><i style="width:${pct}%;background:${pctColor(pct)}"></i></span><span style="color:${pctColor(pct)}">${pct}%</span></div>`;
+      return `<div class="card gallery-card" data-id="${d.id}">
+        <span class="drive-icon">${DRIVE_ICON[d.tipo] || '💾'}</span>
+        <div class="dname">${esc(d.nome)}</div>
+        <div class="id-chip" style="margin:4px auto 0">${d.id}</div>
+        ${bar}
+        ${d.local ? `<div class="card-location" style="font-size:10px;color:var(--txt-soft);margin-top:4px">📍 ${esc(d.local)}</div>` : ''}
+      </div>`;
+    }
+    const bar = pct == null ? '' :
+      `<span class="bar"><i style="width:${pct}%;background:${pctColor(pct)}"></i></span><span style="color:${pctColor(pct)}">${pct}%</span>`;
+    return `<div class="card" data-id="${d.id}">
+      <div class="card-head"><div class="dname">${DRIVE_ICON[d.tipo] || '💾'} ${esc(d.nome)}</div><div class="id-chip">${d.id}</div></div>
+      <div class="match">${snippet(d)}</div>
+      <div class="meta"><span>${LABELS.tipo[d.tipo] || d.tipo}${d.local ? ' · 📍 ' + esc(d.local) : ''}</span>${bar}</div>
+    </div>`;
+  }
+
   function renderBusca(cat) {
     const res = buscar(cat);
     const pills = TIPOS_ARQUIVO.map(t =>
       `<button class="fpill ${state.filtro === t ? 'on' : ''}" data-filtro="${t}">${LABELS.tiposArquivo[t]}</button>`
     ).join('');
 
-    const cards = res.map(d => {
-      const pct = usoPct(d);
-      const bar = pct == null ? '' :
-        `<span class="bar"><i style="width:${pct}%;background:${pctColor(pct)}"></i></span><span style="color:${pctColor(pct)}">${pct}%</span>`;
-      return `<div class="card" data-id="${d.id}">
-        <div class="card-head"><div class="dname">${esc(d.nome)}</div><div class="id-chip">${d.id}</div></div>
-        <div class="match">${snippet(d)}</div>
-        <div class="meta"><span>${LABELS.tipo[d.tipo] || d.tipo}${d.local ? ' · ' + esc(d.local) : ''}</span>${bar}</div>
-      </div>`;
-    }).join('');
+    let resultsHtml;
+    if (state.agrupar) {
+      const grupos = {};
+      res.forEach(d => { const loc = d.local || 'Sem local'; if (!grupos[loc]) grupos[loc] = []; grupos[loc].push(d); });
+      const sorted = Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0]));
+      resultsHtml = sorted.map(([loc, drives]) =>
+        `<div class="group-header">📍 ${esc(loc)} <span class="group-count">(${drives.length})</span></div>
+         <div class="results${state.galeria ? ' gallery' : ''}">${drives.map(d => cardHtml(d, state.galeria)).join('')}</div>`
+      ).join('');
+    } else {
+      const cards = res.map(d => cardHtml(d, state.galeria)).join('');
+      resultsHtml = `<div class="results${state.galeria ? ' gallery' : ''}">${cards || `<div class="empty">Nada encontrado.<br>Tente outra palavra ou tipo.</div>`}</div>`;
+    }
 
     el.innerHTML = `
-      <div class="busca-hero"><img src="icons/omnidrive-icon.png" alt="OmniDrive"></div>
       <div class="searchbar"><span class="mag">⌕</span>
         <input id="q" placeholder="Buscar em todos os drives…" value="${esc(state.query)}" autocomplete="off"></div>
       <div class="filter-row">${pills}</div>
-      <div class="hint">${res.length} drive(s) encontrado(s)</div>
-      <div class="results">${cards || `<div class="empty">Nada encontrado.<br>Tente outra palavra ou tipo.</div>`}</div>`;
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+        <div class="hint" style="margin:0">${res.length} drive(s) encontrado(s)</div>
+        <div class="busca-toggles" style="margin:0">
+          <button class="toggle-btn${state.galeria ? ' on' : ''}" id="tgl-galeria">▦ Galeria</button>
+          <button class="toggle-btn${state.agrupar ? ' on' : ''}" id="tgl-agrupar">📍 Por local</button>
+        </div>
+      </div>
+      ${resultsHtml}`;
 
     const q = document.getElementById('q');
     q.addEventListener('input', () => { state.query = q.value; const pos = q.selectionStart; renderBusca(store.load()); const nq = document.getElementById('q'); nq.focus(); nq.setSelectionRange(pos, pos); });
@@ -436,6 +562,8 @@
       const t = b.dataset.filtro; state.filtro = state.filtro === t ? null : t; renderBusca(store.load());
     }));
     el.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => { state.driveId = c.dataset.id; go('detalhe'); }));
+    document.getElementById('tgl-galeria').addEventListener('click', () => { state.galeria = !state.galeria; renderBusca(store.load()); });
+    document.getElementById('tgl-agrupar').addEventListener('click', () => { state.agrupar = !state.agrupar; renderBusca(store.load()); });
   }
 
   // ================= DETALHE =================
@@ -599,6 +727,7 @@
 
       <label class="flabel">Tags <em>separadas por vírgula</em></label>
       <input class="field" id="f-tags" value="${esc((d.tags || []).join(', '))}" placeholder="Fotos família, Cliente X" autocomplete="off">
+      <div class="tag-suggestions" id="tag-sug"></div>
 
       <label class="flabel">Observações <em>opcional</em></label>
       <textarea class="field" id="f-obs" placeholder="Notas…">${esc(d.observacoes || '')}</textarea>
@@ -638,6 +767,33 @@
     el.querySelector('#add-local').addEventListener('click', () => abrirNovoLocal(el.querySelector('#f-local')));
     el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
+
+    // auto-tag: sugere tags com base no conteúdo digitado
+    const TAG_RULES = [
+      [/foto|raw|jpg|jpeg|png|imagem/i, 'Fotos'], [/v[ií]deo|mp4|mkv|avi|4k/i, 'Vídeos'],
+      [/m[uú]sic|mp3|flac|audio|podcast/i, 'Música'], [/document|pdf|doc|planilh|excel/i, 'Documentos'],
+      [/backup|bkp|c[oó]pia/i, 'Backup'], [/cliente|empresa|trabalho|projeto/i, 'Trabalho'],
+      [/fam[ií]lia|pessoal|casa/i, 'Pessoal'], [/jogo|game|steam/i, 'Jogos'],
+      [/sistema|windows|linux|iso|boot/i, 'Sistema'], [/viagem|f[eé]rias/i, 'Viagem']
+    ];
+    const conteudoEl = el.querySelector('#f-conteudo'), tagsEl = el.querySelector('#f-tags'), sugEl = el.querySelector('#tag-sug');
+    const atualizarSugestoes = () => {
+      const texto = (conteudoEl.value + ' ' + el.querySelector('#f-nome').value).toLowerCase();
+      const jaTemTags = tagsEl.value.toLowerCase().split(',').map(s => s.trim());
+      const sugestoes = TAG_RULES.filter(([re]) => re.test(texto)).map(([, tag]) => tag).filter(t => !jaTemTags.includes(t.toLowerCase()));
+      sugEl.innerHTML = sugestoes.length
+        ? '<span style="font-size:10px;color:var(--txt-soft);margin-right:4px">Sugestões:</span>' + sugestoes.map(t => `<button type="button" class="tag-sug">${t}</button>`).join('')
+        : '';
+      sugEl.querySelectorAll('.tag-sug').forEach(b => b.addEventListener('click', () => {
+        const cur = tagsEl.value.trim();
+        tagsEl.value = cur ? cur + ', ' + b.textContent : b.textContent;
+        atualizarSugestoes();
+      }));
+    };
+    conteudoEl.addEventListener('input', atualizarSugestoes);
+    el.querySelector('#f-nome').addEventListener('input', atualizarSugestoes);
+    tagsEl.addEventListener('input', atualizarSugestoes);
+    atualizarSugestoes();
 
     el.querySelector('#salvar').addEventListener('click', () => {
       const nome = el.querySelector('#f-nome').value.trim();
@@ -691,13 +847,13 @@
         st.textContent = 'Carregando catálogo do Drive…';
         cloudCat = await OmniCloud.loadCatalog();
         mode = 'cloud'; state.authed = true;
-        go('busca');
+        go('dashboard');
       } catch (e) {
         console.error('OmniDrive login error:', e);
         st.textContent = 'Erro: ' + (e.message || 'falha desconhecida') + ' — confira o console (F12) para detalhes.';
       }
     });
-    document.getElementById('e-local').addEventListener('click', () => { mode = 'local'; state.authed = true; go('busca'); });
+    document.getElementById('e-local').addEventListener('click', () => { mode = 'local'; state.authed = true; go('dashboard'); });
   }
 
   // ================= SOBRE =================
@@ -742,12 +898,13 @@
   function go(view) { state.view = view; render(); }
   function render() {
     document.querySelectorAll('.navbtn').forEach(t =>
-      t.classList.toggle('active', t.dataset.view === state.view || (state.view === 'detalhe' && t.dataset.view === 'busca')));
+      t.classList.toggle('active', t.dataset.view === state.view || (state.view === 'detalhe' && t.dataset.view === 'busca') || (state.view === 'versoes' && t.dataset.view === 'dashboard')));
     if (state.view === 'sobre') return renderSobre();
     if (state.view === 'versoes') return renderVersoes();
     if (!state.authed || state.view === 'entrar') return renderEntrar();
     const cat = store.load();
-    if (state.view === 'busca') renderBusca(cat);
+    if (state.view === 'dashboard') renderDashboard(cat);
+    else if (state.view === 'busca') renderBusca(cat);
     else if (state.view === 'detalhe') renderDetalhe(cat);
     else if (state.view === 'cadastro') renderCadastro(cat, state.editId ? cat.drives.find(d => d.id === state.editId) : null);
   }
@@ -757,7 +914,7 @@
     if (t.dataset.view === 'cadastro') state.editId = null;
     go(t.dataset.view);
   }));
-  document.querySelector('.brand').addEventListener('click', () => { if (state.authed) go('busca'); });
+  document.querySelector('.brand').addEventListener('click', () => { if (state.authed) go('dashboard'); });
   document.getElementById('btnSobre').addEventListener('click', () => go('sobre'));
   document.getElementById('btnScan').addEventListener('click', () => {
     if (!state.authed) return go('entrar');
