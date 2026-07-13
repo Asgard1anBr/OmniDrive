@@ -16,8 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.1.5';
+  const VERSAO = '2.2';
   const CHANGELOG = [
+    { v: '2.2', data: '2026-07-13', itens: [
+      'Árvore colapsável de pastas — clique para expandir/recolher sub-níveis.',
+      'Dados completos ficam guardados para busca, mas a exibição é compacta.',
+      'Botão "Editar texto" alterna entre árvore visual e textarea raw.'
+    ]},
     { v: '2.1.5', data: '2026-07-13', itens: [
       'Ícone do calendário agora em ciano (cor do app).',
       'Campo de aquisição limpo — placeholder quando vazio, sem tracinhos.',
@@ -98,7 +103,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.1.5', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -750,7 +755,8 @@
       <label class="flabel">Conteúdo <em>lista, vírgulas, do seu jeito</em></label>
       <button type="button" class="btn-scan" id="scan-dir">📂 Escanear pastas do drive</button>
       <input type="file" id="scan-fallback" webkitdirectory multiple hidden>
-      <textarea class="field" id="f-conteudo" placeholder="Casamento fotos RAW 2019, Fotos viagem Chile…">${esc(d.conteudo || '')}</textarea>
+      <div id="tree-view"></div>
+      <textarea class="field" id="f-conteudo" placeholder="Casamento fotos RAW 2019, Fotos viagem Chile…" style="${d.conteudo && d.conteudo.includes('›') ? 'display:none' : ''}">${esc(d.conteudo || '')}</textarea>
       <div class="muted" id="scan-status" style="font-size:11px;min-height:14px;margin-top:4px"></div>
 
       <label class="flabel">Tags <em>separadas por vírgula</em></label>
@@ -796,6 +802,65 @@
     el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
 
+    // --- árvore colapsável de pastas ---
+    function renderTree(container, texto) {
+      if (!texto || !texto.includes('›')) { container.innerHTML = ''; return; }
+      const linhas = texto.split('\n').filter(l => l.trim());
+      const tree = [];
+      const stack = [{ children: tree, level: -1 }];
+      for (const l of linhas) {
+        const match = l.match(/^(›*)\s*(.*)/);
+        const level = match ? match[1].length : 0;
+        const nome = match ? match[2] : l;
+        const node = { nome, level, children: [] };
+        while (stack.length > 1 && stack[stack.length - 1].level >= level) stack.pop();
+        stack[stack.length - 1].children.push(node);
+        stack.push(node);
+      }
+      function buildHtml(nodes, hidden) {
+        let h = '<ul class="tree-list"' + (hidden ? ' style="display:none"' : '') + '>';
+        for (const n of nodes) {
+          const has = n.children.length > 0;
+          h += '<li class="tree-item">';
+          h += '<div class="tree-row' + (has ? ' tree-parent' : '') + '">';
+          if (has) h += '<span class="tree-arrow">▸</span>';
+          else h += '<span class="tree-dot">·</span>';
+          h += '<span class="tree-name">📁 ' + esc(n.nome) + '</span>';
+          if (has) h += '<span class="tree-count">' + n.children.length + '</span>';
+          h += '</div>';
+          if (has) h += buildHtml(n.children, true);
+          h += '</li>';
+        }
+        return h + '</ul>';
+      }
+      container.innerHTML = '<div class="tree-header"><span>📂 Pastas escaneadas</span><button type="button" class="tree-toggle" id="tree-edit">✏️ Editar texto</button></div>' + buildHtml(tree, false);
+      container.querySelectorAll('.tree-parent').forEach(row => {
+        row.addEventListener('click', () => {
+          const ul = row.parentElement.querySelector(':scope > ul');
+          const arrow = row.querySelector('.tree-arrow');
+          if (ul) {
+            const open = ul.style.display !== 'none';
+            ul.style.display = open ? 'none' : '';
+            arrow.textContent = open ? '▸' : '▾';
+          }
+        });
+      });
+      const editBtn = container.querySelector('#tree-edit');
+      if (editBtn) {
+        editBtn.addEventListener('click', () => {
+          const ta = el.querySelector('#f-conteudo');
+          const showing = ta.style.display !== 'none';
+          ta.style.display = showing ? 'none' : '';
+          editBtn.textContent = showing ? '✏️ Editar texto' : '🌳 Ver árvore';
+        });
+      }
+    }
+    const treeView = el.querySelector('#tree-view');
+    renderTree(treeView, el.querySelector('#f-conteudo').value);
+    el.querySelector('#f-conteudo').addEventListener('input', () => {
+      renderTree(treeView, el.querySelector('#f-conteudo').value);
+    });
+
     // escanear árvore de diretórios do drive plugado
     const scanBtn = el.querySelector('#scan-dir');
     const scanFallback = el.querySelector('#scan-fallback');
@@ -817,6 +882,7 @@
         m2.querySelector('#m-cancel').onclick = () => { m2.remove(); scanSt.textContent = ''; };
         m2.querySelector('#m-juntar').onclick = () => {
           conteudoEl.value = atual + '\n' + lista;
+          conteudoEl.style.display = 'none';
           conteudoEl.dispatchEvent(new Event('input'));
           m2.remove();
           scanSt.textContent = '✓ ' + totalPastas + ' pastas adicionadas ao conteúdo existente.';
@@ -824,6 +890,7 @@
         };
         m2.querySelector('#m-subst').onclick = () => {
           conteudoEl.value = lista;
+          conteudoEl.style.display = 'none';
           conteudoEl.dispatchEvent(new Event('input'));
           m2.remove();
           scanSt.textContent = '✓ Conteúdo substituído com ' + totalPastas + ' pastas.';
@@ -831,6 +898,7 @@
         };
       } else {
         conteudoEl.value = lista;
+        conteudoEl.style.display = 'none';
         conteudoEl.dispatchEvent(new Event('input'));
         scanSt.textContent = '✓ ' + totalPastas + ' pastas de "' + nomeRaiz + '" adicionadas.';
         scanSt.style.color = 'var(--cyan)';
