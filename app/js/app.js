@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.2';
+  const VERSAO = '2.2.1';
   const CHANGELOG = [
+    { v: '2.2.1', data: '2026-07-13', itens: [
+      'Árvore colapsável também na tela de detalhe do drive.',
+      'Botões Editar e Gerar QR movidos para o topo da página.'
+    ]},
     { v: '2.2', data: '2026-07-13', itens: [
       'Árvore colapsável de pastas — clique para expandir/recolher sub-níveis.',
       'Dados completos ficam guardados para busca, mas a exibição é compacta.',
@@ -103,7 +107,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.2.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -593,6 +597,53 @@
     document.getElementById('tgl-agrupar').addEventListener('click', () => { state.agrupar = !state.agrupar; renderBusca(store.load()); });
   }
 
+  // ================= ÁRVORE DE PASTAS (readonly) =================
+  function parseTree(texto) {
+    const linhas = texto.split('\n').filter(l => l.trim());
+    const tree = [];
+    const stack = [{ children: tree, level: -1 }];
+    for (const l of linhas) {
+      const match = l.match(/^(›*)\s*(.*)/);
+      const level = match ? match[1].length : 0;
+      const nome = match ? match[2] : l;
+      const node = { nome, level, children: [] };
+      while (stack.length > 1 && stack[stack.length - 1].level >= level) stack.pop();
+      stack[stack.length - 1].children.push(node);
+      stack.push(node);
+    }
+    return tree;
+  }
+  function buildTreeHtml(nodes, hidden) {
+    let h = '<ul class="tree-list"' + (hidden ? ' style="display:none"' : '') + '>';
+    for (const n of nodes) {
+      const has = n.children.length > 0;
+      h += '<li class="tree-item"><div class="tree-row' + (has ? ' tree-parent' : '') + '">';
+      if (has) h += '<span class="tree-arrow">▸</span>';
+      else h += '<span class="tree-dot">·</span>';
+      h += '<span class="tree-name">📁 ' + esc(n.nome) + '</span>';
+      if (has) h += '<span class="tree-count">' + n.children.length + '</span>';
+      h += '</div>';
+      if (has) h += buildTreeHtml(n.children, true);
+      h += '</li>';
+    }
+    return h + '</ul>';
+  }
+  function bindTreeClicks(container) {
+    container.querySelectorAll('.tree-parent').forEach(row => {
+      row.addEventListener('click', () => {
+        const ul = row.parentElement.querySelector(':scope > ul');
+        const arrow = row.querySelector('.tree-arrow');
+        if (ul) { const open = ul.style.display !== 'none'; ul.style.display = open ? 'none' : ''; arrow.textContent = open ? '▸' : '▾'; }
+      });
+    });
+  }
+  function renderTreeReadonly(container, texto) {
+    if (!texto || !texto.includes('›')) return;
+    const tree = parseTree(texto);
+    container.innerHTML = buildTreeHtml(tree, false);
+    bindTreeClicks(container);
+  }
+
   // ================= DETALHE =================
   function renderDetalhe(cat) {
     const d = cat.drives.find(x => x.id === state.driveId);
@@ -633,8 +684,9 @@
     const tags = TIPOS_ARQUIVO.map(t =>
       `<span class="tag ${(d.tiposArquivo || []).includes(t) ? 'on' : ''}">${LABELS.tiposArquivo[t]}</span>`).join('');
 
-    const linhas = splitConteudo(d.conteudo).map(i => `<div class="line">${esc(i)}</div>`).join('')
-      || `<div class="line muted">Sem conteúdo cadastrado.</div>`;
+    const temArvore = d.conteudo && d.conteudo.includes('›');
+    const linhas = temArvore ? '' : (splitConteudo(d.conteudo).map(i => `<div class="line">${esc(i)}</div>`).join('')
+      || `<div class="line muted">Sem conteúdo cadastrado.</div>`);
 
     el.innerHTML = `
       <button class="back" id="back">‹ Voltar</button>
@@ -642,16 +694,19 @@
         <div class="screen-label" style="margin:0">${esc(d.nome)}</div>
         <div class="muted" style="font-size:12px">${d.id}${d.aquisicao ? ' · ' + esc(d.aquisicao) : ''}</div>
       </div>
-      ${gauge}
-      <div class="chips">${chips}</div>
-      <div class="hint">Tipos de arquivo</div><div class="tags">${tags}</div>
-      <div class="hint">Conteúdo</div><div class="content-list">${linhas}</div>
-      ${d.observacoes ? `<div class="hint">Observações</div><div class="muted" style="font-size:13px">${esc(d.observacoes)}</div>` : ''}
-      <div class="form-actions">
+      <div class="form-actions" style="margin-top:12px">
         <button class="btn ghost" id="editar">✎ Editar</button>
         <button class="btn" id="qr">⌗ Gerar QR</button>
       </div>
+      ${gauge}
+      <div class="chips">${chips}</div>
+      <div class="hint">Tipos de arquivo</div><div class="tags">${tags}</div>
+      <div class="hint">Conteúdo</div>
+      ${temArvore ? '<div id="detail-tree"></div>' : `<div class="content-list">${linhas}</div>`}
+      ${d.observacoes ? `<div class="hint">Observações</div><div class="muted" style="font-size:13px">${esc(d.observacoes)}</div>` : ''}
       <button class="btn-remove-small" id="remover">Remover drive</button>`;
+
+    if (temArvore) renderTreeReadonly(el.querySelector('#detail-tree'), d.conteudo);
 
     document.getElementById('back').addEventListener('click', () => go('busca'));
     document.getElementById('editar').addEventListener('click', () => { state.editId = d.id; go('cadastro'); });
@@ -802,63 +857,23 @@
     el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
 
-    // --- árvore colapsável de pastas ---
-    function renderTree(container, texto) {
+    // --- árvore colapsável de pastas (formulário) ---
+    function renderTreeForm(container, texto) {
       if (!texto || !texto.includes('›')) { container.innerHTML = ''; return; }
-      const linhas = texto.split('\n').filter(l => l.trim());
-      const tree = [];
-      const stack = [{ children: tree, level: -1 }];
-      for (const l of linhas) {
-        const match = l.match(/^(›*)\s*(.*)/);
-        const level = match ? match[1].length : 0;
-        const nome = match ? match[2] : l;
-        const node = { nome, level, children: [] };
-        while (stack.length > 1 && stack[stack.length - 1].level >= level) stack.pop();
-        stack[stack.length - 1].children.push(node);
-        stack.push(node);
-      }
-      function buildHtml(nodes, hidden) {
-        let h = '<ul class="tree-list"' + (hidden ? ' style="display:none"' : '') + '>';
-        for (const n of nodes) {
-          const has = n.children.length > 0;
-          h += '<li class="tree-item">';
-          h += '<div class="tree-row' + (has ? ' tree-parent' : '') + '">';
-          if (has) h += '<span class="tree-arrow">▸</span>';
-          else h += '<span class="tree-dot">·</span>';
-          h += '<span class="tree-name">📁 ' + esc(n.nome) + '</span>';
-          if (has) h += '<span class="tree-count">' + n.children.length + '</span>';
-          h += '</div>';
-          if (has) h += buildHtml(n.children, true);
-          h += '</li>';
-        }
-        return h + '</ul>';
-      }
-      container.innerHTML = '<div class="tree-header"><span>📂 Pastas escaneadas</span><button type="button" class="tree-toggle" id="tree-edit">✏️ Editar texto</button></div>' + buildHtml(tree, false);
-      container.querySelectorAll('.tree-parent').forEach(row => {
-        row.addEventListener('click', () => {
-          const ul = row.parentElement.querySelector(':scope > ul');
-          const arrow = row.querySelector('.tree-arrow');
-          if (ul) {
-            const open = ul.style.display !== 'none';
-            ul.style.display = open ? 'none' : '';
-            arrow.textContent = open ? '▸' : '▾';
-          }
-        });
+      const tree = parseTree(texto);
+      container.innerHTML = '<div class="tree-header"><span>📂 Pastas escaneadas</span><button type="button" class="tree-toggle" id="tree-edit">✏️ Editar texto</button></div>' + buildTreeHtml(tree, false);
+      bindTreeClicks(container);
+      container.querySelector('#tree-edit').addEventListener('click', () => {
+        const ta = el.querySelector('#f-conteudo');
+        const showing = ta.style.display !== 'none';
+        ta.style.display = showing ? 'none' : '';
+        container.querySelector('#tree-edit').textContent = showing ? '✏️ Editar texto' : '🌳 Ver árvore';
       });
-      const editBtn = container.querySelector('#tree-edit');
-      if (editBtn) {
-        editBtn.addEventListener('click', () => {
-          const ta = el.querySelector('#f-conteudo');
-          const showing = ta.style.display !== 'none';
-          ta.style.display = showing ? 'none' : '';
-          editBtn.textContent = showing ? '✏️ Editar texto' : '🌳 Ver árvore';
-        });
-      }
     }
     const treeView = el.querySelector('#tree-view');
-    renderTree(treeView, el.querySelector('#f-conteudo').value);
+    renderTreeForm(treeView, el.querySelector('#f-conteudo').value);
     el.querySelector('#f-conteudo').addEventListener('input', () => {
-      renderTree(treeView, el.querySelector('#f-conteudo').value);
+      renderTreeForm(treeView, el.querySelector('#f-conteudo').value);
     });
 
     // escanear árvore de diretórios do drive plugado
