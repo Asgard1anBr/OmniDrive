@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.2.1';
+  const VERSAO = '2.2.2';
   const CHANGELOG = [
+    { v: '2.2.2', data: '2026-07-13', itens: [
+      'Scan agora inclui a pasta raiz selecionada como topo da árvore.',
+      'Subpastas corretamente aninhadas — apenas a raiz aparece expandida.'
+    ]},
     { v: '2.2.1', data: '2026-07-13', itens: [
       'Árvore colapsável também na tela de detalhe do drive.',
       'Botões Editar e Gerar QR movidos para o topo da página.'
@@ -107,7 +111,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.2.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.2.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -931,20 +935,18 @@
         const partes = f.webkitRelativePath.split('/');
         if (!nomeRaiz) nomeRaiz = partes[0];
         for (let i = 1; i < partes.length; i++) {
-          const caminho = partes.slice(1, i + 1);
           if (i < partes.length - 1) {
-            const prof = i - 1;
-            const prefixo = '›'.repeat(prof);
-            const nome = caminho[caminho.length - 1];
+            const prof = i;
+            const nome = partes[i];
             if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') continue;
-            pastasSet.add(prof === 0 ? nome : prefixo + ' ' + nome);
+            pastasSet.add('›'.repeat(prof) + (prof > 0 ? ' ' : '') + nome);
           }
         }
       }
-      const linhas = [...pastasSet].sort((a, b) => {
+      const linhas = [nomeRaiz, ...[...pastasSet].sort((a, b) => {
         const na = a.replace(/^›+ /, ''), nb = b.replace(/^›+ /, '');
         return na.localeCompare(nb);
-      });
+      })];
       if (!linhas.length) {
         scanSt.textContent = 'Nenhuma pasta encontrada.';
         scanSt.style.color = 'var(--warn)';
@@ -978,8 +980,7 @@
           }
           entries.sort((a, b) => a.nome.localeCompare(b.nome));
           for (const { nome, entry } of entries) {
-            const prefixo = '›'.repeat(prof);
-            linhas.push(prof === 0 ? nome : prefixo + ' ' + nome);
+            linhas.push('›'.repeat(prof) + (prof > 0 ? ' ' : '') + nome);
             if (prof < max) {
               const sub = await listarPastas(entry, prof + 1, max);
               linhas.push(...sub);
@@ -988,7 +989,8 @@
           return linhas;
         }
 
-        const linhas = await listarPastas(handle, 0, 2);
+        const sub = await listarPastas(handle, 1, 3);
+        const linhas = [handle.name, ...sub];
         if (!linhas.length) {
           scanSt.textContent = 'Nenhuma pasta encontrada em "' + handle.name + '".';
           scanSt.style.color = 'var(--warn)';
