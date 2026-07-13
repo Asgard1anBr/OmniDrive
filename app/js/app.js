@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.1.2';
+  const VERSAO = '2.1.3';
   const CHANGELOG = [
+    { v: '2.1.3', data: '2026-07-13', itens: [
+      'Escanear drive agora funciona no Brave e outros browsers (fallback via seletor de pasta).',
+      'Ícone do calendário de aquisição corrigido (agora branco).'
+    ]},
     { v: '2.1.2', data: '2026-07-13', itens: [
       'Escanear drive: formato hierárquico com › mostrando quem está dentro de quem.',
       'Pastas raiz sem prefixo, subpastas com ›, sub-sub com ›› — uma por linha, buscável.'
@@ -88,7 +92,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.1.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.1.3', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -735,7 +739,8 @@
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}
 
       <label class="flabel">Conteúdo <em>lista, vírgulas, do seu jeito</em></label>
-      ${'showDirectoryPicker' in window ? `<button type="button" class="btn-add" id="scan-dir" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:5px">📂 Escanear pastas do drive</button>` : ''}
+            <button type="button" class="btn-add" id="scan-dir" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:5px">📂 Escanear pastas do drive</button>
+      <input type="file" id="scan-fallback" webkitdirectory multiple hidden>
       <textarea class="field" id="f-conteudo" placeholder="Casamento fotos RAW 2019, Fotos viagem Chile…">${esc(d.conteudo || '')}</textarea>
       <div class="muted" id="scan-status" style="font-size:11px;min-height:14px;margin-top:4px"></div>
 
@@ -784,86 +789,129 @@
 
     // escanear árvore de diretórios do drive plugado
     const scanBtn = el.querySelector('#scan-dir');
-    if (scanBtn) {
-      scanBtn.addEventListener('click', async () => {
-        const scanSt = el.querySelector('#scan-status');
-        try {
-          scanSt.textContent = 'Selecione a pasta raiz do drive externo (pen drive, HD externo etc.)…';
-          scanSt.style.color = 'var(--txt-mid)';
-          const handle = await window.showDirectoryPicker({ mode: 'read' });
-          scanSt.textContent = 'Lendo pastas de "' + handle.name + '"…';
-          scanBtn.disabled = true;
+    const scanFallback = el.querySelector('#scan-fallback');
 
-          async function listarPastas(dirHandle, prof, max) {
-            const linhas = [];
-            const entries = [];
-            for await (const [nome, entry] of dirHandle.entries()) {
-              if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') continue;
-              if (entry.kind === 'directory') entries.push({ nome, entry });
-            }
-            entries.sort((a, b) => a.nome.localeCompare(b.nome));
-            for (const { nome, entry } of entries) {
-              const prefixo = '›'.repeat(prof);
-              linhas.push(prof === 0 ? nome : prefixo + ' ' + nome);
-              if (prof < max) {
-                const sub = await listarPastas(entry, prof + 1, max);
-                linhas.push(...sub);
-              }
-            }
-            return linhas;
-          }
+    function aplicarScan(lista, totalPastas, nomeRaiz) {
+      const scanSt = el.querySelector('#scan-status');
+      const conteudoEl = el.querySelector('#f-conteudo');
+      const atual = conteudoEl.value.trim();
 
-          const linhas = await listarPastas(handle, 0, 2);
-          if (!linhas.length) {
-            scanSt.textContent = 'Nenhuma pasta encontrada em "' + handle.name + '".';
-            scanSt.style.color = 'var(--warn)';
-            scanBtn.disabled = false;
-            return;
-          }
-
-          const totalPastas = linhas.length;
-          const lista = linhas.join('\n');
-          const conteudoEl = el.querySelector('#f-conteudo');
-          const atual = conteudoEl.value.trim();
-
-          if (atual) {
-            const m2 = modal(`<h3>Conteúdo já preenchido</h3>
-              <p class="muted" style="font-size:13px">O campo de conteúdo já tem texto. O que deseja fazer com as <b style="color:#fff">${totalPastas} pastas</b> encontradas em "${esc(handle.name)}"?</p>
-              <div style="max-height:160px;overflow-y:auto;background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin:12px 0;font-size:12px;color:var(--txt-mid);line-height:1.6;white-space:pre-line">${esc(lista)}</div>
-              <div class="form-actions">
-                <button type="button" class="btn ghost" id="m-cancel">Cancelar</button>
-                <button type="button" class="btn ghost" id="m-juntar">Juntar ao existente</button>
-                <button type="button" class="btn" id="m-subst">Substituir tudo</button>
-              </div>`);
-            m2.querySelector('#m-cancel').onclick = () => { m2.remove(); scanSt.textContent = ''; };
-            m2.querySelector('#m-juntar').onclick = () => {
-              conteudoEl.value = atual + '\n' + lista;
-              conteudoEl.dispatchEvent(new Event('input'));
-              m2.remove();
-              scanSt.textContent = '✓ ' + totalPastas + ' pastas adicionadas ao conteúdo existente.';
-              scanSt.style.color = 'var(--cyan)';
-            };
-            m2.querySelector('#m-subst').onclick = () => {
-              conteudoEl.value = lista;
-              conteudoEl.dispatchEvent(new Event('input'));
-              m2.remove();
-              scanSt.textContent = '✓ Conteúdo substituído com ' + totalPastas + ' pastas.';
-              scanSt.style.color = 'var(--cyan)';
-            };
-          } else {
-            conteudoEl.value = lista;
-            conteudoEl.dispatchEvent(new Event('input'));
-            scanSt.textContent = '✓ ' + totalPastas + ' pastas de "' + handle.name + '" adicionadas.';
-            scanSt.style.color = 'var(--cyan)';
-          }
-          scanBtn.disabled = false;
-        } catch (e) {
-          if (e.name === 'AbortError') { scanSt.textContent = ''; }
-          else { scanSt.textContent = 'Erro: ' + (e.message || 'não foi possível ler'); scanSt.style.color = 'var(--warn)'; }
-          scanBtn.disabled = false;
-        }
-      });
+      if (atual) {
+        const m2 = modal(`<h3>Conteúdo já preenchido</h3>
+          <p class="muted" style="font-size:13px">O campo de conteúdo já tem texto. O que deseja fazer com as <b style="color:#fff">${totalPastas} pastas</b> encontradas em "${esc(nomeRaiz)}"?</p>
+          <div style="max-height:160px;overflow-y:auto;background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin:12px 0;font-size:12px;color:var(--txt-mid);line-height:1.6;white-space:pre-line">${esc(lista)}</div>
+          <div class="form-actions">
+            <button type="button" class="btn ghost" id="m-cancel">Cancelar</button>
+            <button type="button" class="btn ghost" id="m-juntar">Juntar ao existente</button>
+            <button type="button" class="btn" id="m-subst">Substituir tudo</button>
+          </div>`);
+        m2.querySelector('#m-cancel').onclick = () => { m2.remove(); scanSt.textContent = ''; };
+        m2.querySelector('#m-juntar').onclick = () => {
+          conteudoEl.value = atual + '\n' + lista;
+          conteudoEl.dispatchEvent(new Event('input'));
+          m2.remove();
+          scanSt.textContent = '✓ ' + totalPastas + ' pastas adicionadas ao conteúdo existente.';
+          scanSt.style.color = 'var(--cyan)';
+        };
+        m2.querySelector('#m-subst').onclick = () => {
+          conteudoEl.value = lista;
+          conteudoEl.dispatchEvent(new Event('input'));
+          m2.remove();
+          scanSt.textContent = '✓ Conteúdo substituído com ' + totalPastas + ' pastas.';
+          scanSt.style.color = 'var(--cyan)';
+        };
+      } else {
+        conteudoEl.value = lista;
+        conteudoEl.dispatchEvent(new Event('input'));
+        scanSt.textContent = '✓ ' + totalPastas + ' pastas de "' + nomeRaiz + '" adicionadas.';
+        scanSt.style.color = 'var(--cyan)';
+      }
     }
+
+    // fallback via <input webkitdirectory> (Brave e browsers sem showDirectoryPicker)
+    scanFallback.addEventListener('change', () => {
+      const scanSt = el.querySelector('#scan-status');
+      const files = scanFallback.files;
+      if (!files.length) return;
+      const pastasSet = new Set();
+      let nomeRaiz = '';
+      for (const f of files) {
+        const partes = f.webkitRelativePath.split('/');
+        if (!nomeRaiz) nomeRaiz = partes[0];
+        for (let i = 1; i < partes.length; i++) {
+          const caminho = partes.slice(1, i + 1);
+          if (i < partes.length - 1) {
+            const prof = i - 1;
+            const prefixo = '›'.repeat(prof);
+            const nome = caminho[caminho.length - 1];
+            if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') continue;
+            pastasSet.add(prof === 0 ? nome : prefixo + ' ' + nome);
+          }
+        }
+      }
+      const linhas = [...pastasSet].sort((a, b) => {
+        const na = a.replace(/^›+ /, ''), nb = b.replace(/^›+ /, '');
+        return na.localeCompare(nb);
+      });
+      if (!linhas.length) {
+        scanSt.textContent = 'Nenhuma pasta encontrada.';
+        scanSt.style.color = 'var(--warn)';
+        return;
+      }
+      aplicarScan(linhas.join('\n'), linhas.length, nomeRaiz);
+      scanFallback.value = '';
+    });
+
+    scanBtn.addEventListener('click', async () => {
+      const scanSt = el.querySelector('#scan-status');
+      if (!('showDirectoryPicker' in window)) {
+        scanSt.textContent = 'Selecione a pasta raiz do drive externo…';
+        scanSt.style.color = 'var(--txt-mid)';
+        scanFallback.click();
+        return;
+      }
+      try {
+        scanSt.textContent = 'Selecione a pasta raiz do drive externo (pen drive, HD externo etc.)…';
+        scanSt.style.color = 'var(--txt-mid)';
+        const handle = await window.showDirectoryPicker({ mode: 'read' });
+        scanSt.textContent = 'Lendo pastas de "' + handle.name + '"…';
+        scanBtn.disabled = true;
+
+        async function listarPastas(dirHandle, prof, max) {
+          const linhas = [];
+          const entries = [];
+          for await (const [nome, entry] of dirHandle.entries()) {
+            if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') continue;
+            if (entry.kind === 'directory') entries.push({ nome, entry });
+          }
+          entries.sort((a, b) => a.nome.localeCompare(b.nome));
+          for (const { nome, entry } of entries) {
+            const prefixo = '›'.repeat(prof);
+            linhas.push(prof === 0 ? nome : prefixo + ' ' + nome);
+            if (prof < max) {
+              const sub = await listarPastas(entry, prof + 1, max);
+              linhas.push(...sub);
+            }
+          }
+          return linhas;
+        }
+
+        const linhas = await listarPastas(handle, 0, 2);
+        if (!linhas.length) {
+          scanSt.textContent = 'Nenhuma pasta encontrada em "' + handle.name + '".';
+          scanSt.style.color = 'var(--warn)';
+          scanBtn.disabled = false;
+          return;
+        }
+
+        aplicarScan(linhas.join('\n'), linhas.length, handle.name);
+        scanBtn.disabled = false;
+      } catch (e) {
+        if (e.name === 'AbortError') { scanSt.textContent = ''; }
+        else { scanSt.textContent = 'Erro: ' + (e.message || 'não foi possível ler'); scanSt.style.color = 'var(--warn)'; }
+        scanBtn.disabled = false;
+      }
+    });
 
     // auto-tag: sugere tags com base no conteúdo digitado
     const TAG_RULES = [
