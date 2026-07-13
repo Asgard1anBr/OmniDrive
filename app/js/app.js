@@ -16,8 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.0';
+  const VERSAO = '2.1';
   const CHANGELOG = [
+    { v: '2.1', data: '2026-07-13', itens: [
+      'Novo: Escanear drive — botão 📂 no cadastro lê a árvore de pastas do drive plugado e preenche o campo de conteúdo.',
+      'Exibe a árvore com formatação visual (├── └──), até 3 níveis de profundidade.',
+      'Conteúdo escaneado é editável livremente após o scan.'
+    ]},
     { v: '2.0', data: '2026-07-13', itens: [
       'Novo: Painel (Dashboard) com estatísticas, distribuição por tipo e local, drives mais cheios.',
       'Novo: Dicas de reorganização — sugestões para consolidar ou reorganizar drives.',
@@ -76,7 +81,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -723,7 +728,9 @@
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}
 
       <label class="flabel">Conteúdo <em>lista, vírgulas, do seu jeito</em></label>
+      ${'showDirectoryPicker' in window ? `<button type="button" class="btn-add" id="scan-dir" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:5px">📂 Escanear drive</button>` : ''}
       <textarea class="field" id="f-conteudo" placeholder="Casamento fotos RAW 2019, Fotos viagem Chile…">${esc(d.conteudo || '')}</textarea>
+      <div class="muted" id="scan-status" style="font-size:11px;min-height:14px;margin-top:4px"></div>
 
       <label class="flabel">Tags <em>separadas por vírgula</em></label>
       <input class="field" id="f-tags" value="${esc((d.tags || []).join(', '))}" placeholder="Fotos família, Cliente X" autocomplete="off">
@@ -767,6 +774,69 @@
     el.querySelector('#add-local').addEventListener('click', () => abrirNovoLocal(el.querySelector('#f-local')));
     el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
+
+    // escanear árvore de diretórios do drive plugado
+    const scanBtn = el.querySelector('#scan-dir');
+    if (scanBtn) {
+      scanBtn.addEventListener('click', async () => {
+        const scanSt = el.querySelector('#scan-status');
+        try {
+          const handle = await window.showDirectoryPicker({ mode: 'read' });
+          scanSt.textContent = 'Lendo pastas…';
+          scanBtn.disabled = true;
+
+          async function lerArvore(dirHandle, profundidade, maxProf) {
+            const itens = [];
+            for await (const [nome, entry] of dirHandle.entries()) {
+              if (nome.startsWith('.')) continue;
+              if (entry.kind === 'directory') {
+                const filhos = profundidade < maxProf ? await lerArvore(entry, profundidade + 1, maxProf) : [];
+                itens.push({ nome, filhos });
+              } else {
+                itens.push({ nome, filhos: null });
+              }
+            }
+            itens.sort((a, b) => {
+              if (a.filhos !== null && b.filhos === null) return -1;
+              if (a.filhos === null && b.filhos !== null) return 1;
+              return a.nome.localeCompare(b.nome);
+            });
+            return itens;
+          }
+
+          function formatar(itens, prefixo) {
+            return itens.map((item, i) => {
+              const ultimo = i === itens.length - 1;
+              const conector = ultimo ? '└── ' : '├── ';
+              const linha = prefixo + conector + item.nome;
+              if (item.filhos && item.filhos.length) {
+                const novoP = prefixo + (ultimo ? '    ' : '│   ');
+                return linha + '\n' + formatar(item.filhos, novoP);
+              }
+              return linha;
+            }).join('\n');
+          }
+
+          const arvore = await lerArvore(handle, 0, 2);
+          const texto = handle.name + '/\n' + formatar(arvore, '');
+
+          const totalPastas = (function contar(arr) { return arr.reduce((s, i) => s + (i.filhos ? 1 + contar(i.filhos) : 0), 0); })(arvore);
+          const totalArquivos = (function contar(arr) { return arr.reduce((s, i) => s + (i.filhos === null ? 1 : contar(i.filhos)), 0); })(arvore);
+
+          const conteudoEl = el.querySelector('#f-conteudo');
+          const atual = conteudoEl.value.trim();
+          conteudoEl.value = atual ? atual + '\n\n--- Árvore escaneada ---\n' + texto : texto;
+          conteudoEl.dispatchEvent(new Event('input'));
+          scanSt.textContent = '✓ ' + totalPastas + ' pastas e ' + totalArquivos + ' arquivos encontrados (até 3 níveis).';
+          scanSt.style.color = 'var(--cyan)';
+          scanBtn.disabled = false;
+        } catch (e) {
+          if (e.name === 'AbortError') { scanSt.textContent = ''; }
+          else { scanSt.textContent = 'Erro: ' + (e.message || 'não foi possível ler'); scanSt.style.color = 'var(--warn)'; }
+          scanBtn.disabled = false;
+        }
+      });
+    }
 
     // auto-tag: sugere tags com base no conteúdo digitado
     const TAG_RULES = [
