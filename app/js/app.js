@@ -16,10 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.1.1';
+  const VERSAO = '2.1.2';
   const CHANGELOG = [
+    { v: '2.1.2', data: '2026-07-13', itens: [
+      'Escanear drive: formato hierárquico com › mostrando quem está dentro de quem.',
+      'Pastas raiz sem prefixo, subpastas com ›, sub-sub com ›› — uma por linha, buscável.'
+    ]},
     { v: '2.1.1', data: '2026-07-13', itens: [
-      'Escanear drive: formato linear (pastas separadas por vírgula) — funciona com a busca.',
       'Se já existe conteúdo, pergunta se quer juntar ou substituir antes de aplicar.',
       'Texto guia pede pra selecionar o drive externo (não o disco local).'
     ]},
@@ -85,7 +88,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.1.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.1.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -792,36 +795,41 @@
           scanBtn.disabled = true;
 
           async function listarPastas(dirHandle, prof, max) {
-            const nomes = [];
+            const linhas = [];
+            const entries = [];
             for await (const [nome, entry] of dirHandle.entries()) {
-              if (nome.startsWith('.') || nome.startsWith('$')) continue;
-              if (entry.kind === 'directory') {
-                nomes.push(nome);
-                if (prof < max) {
-                  const sub = await listarPastas(entry, prof + 1, max);
-                  sub.forEach(s => nomes.push(nome + ' > ' + s));
-                }
+              if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') continue;
+              if (entry.kind === 'directory') entries.push({ nome, entry });
+            }
+            entries.sort((a, b) => a.nome.localeCompare(b.nome));
+            for (const { nome, entry } of entries) {
+              const prefixo = '›'.repeat(prof);
+              linhas.push(prof === 0 ? nome : prefixo + ' ' + nome);
+              if (prof < max) {
+                const sub = await listarPastas(entry, prof + 1, max);
+                linhas.push(...sub);
               }
             }
-            return nomes.sort((a, b) => a.localeCompare(b));
+            return linhas;
           }
 
-          const pastas = await listarPastas(handle, 0, 2);
-          if (!pastas.length) {
+          const linhas = await listarPastas(handle, 0, 2);
+          if (!linhas.length) {
             scanSt.textContent = 'Nenhuma pasta encontrada em "' + handle.name + '".';
             scanSt.style.color = 'var(--warn)';
             scanBtn.disabled = false;
             return;
           }
 
-          const lista = pastas.join(', ');
+          const totalPastas = linhas.length;
+          const lista = linhas.join('\n');
           const conteudoEl = el.querySelector('#f-conteudo');
           const atual = conteudoEl.value.trim();
 
           if (atual) {
             const m2 = modal(`<h3>Conteúdo já preenchido</h3>
-              <p class="muted" style="font-size:13px">O campo de conteúdo já tem texto. O que deseja fazer com as <b style="color:#fff">${pastas.length} pastas</b> encontradas em "${esc(handle.name)}"?</p>
-              <div style="max-height:140px;overflow-y:auto;background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin:12px 0;font-size:12px;color:var(--txt-mid);line-height:1.6">${esc(lista)}</div>
+              <p class="muted" style="font-size:13px">O campo de conteúdo já tem texto. O que deseja fazer com as <b style="color:#fff">${totalPastas} pastas</b> encontradas em "${esc(handle.name)}"?</p>
+              <div style="max-height:160px;overflow-y:auto;background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin:12px 0;font-size:12px;color:var(--txt-mid);line-height:1.6;white-space:pre-line">${esc(lista)}</div>
               <div class="form-actions">
                 <button type="button" class="btn ghost" id="m-cancel">Cancelar</button>
                 <button type="button" class="btn ghost" id="m-juntar">Juntar ao existente</button>
@@ -829,23 +837,23 @@
               </div>`);
             m2.querySelector('#m-cancel').onclick = () => { m2.remove(); scanSt.textContent = ''; };
             m2.querySelector('#m-juntar').onclick = () => {
-              conteudoEl.value = atual + ', ' + lista;
+              conteudoEl.value = atual + '\n' + lista;
               conteudoEl.dispatchEvent(new Event('input'));
               m2.remove();
-              scanSt.textContent = '✓ ' + pastas.length + ' pastas adicionadas ao conteúdo existente.';
+              scanSt.textContent = '✓ ' + totalPastas + ' pastas adicionadas ao conteúdo existente.';
               scanSt.style.color = 'var(--cyan)';
             };
             m2.querySelector('#m-subst').onclick = () => {
               conteudoEl.value = lista;
               conteudoEl.dispatchEvent(new Event('input'));
               m2.remove();
-              scanSt.textContent = '✓ Conteúdo substituído com ' + pastas.length + ' pastas.';
+              scanSt.textContent = '✓ Conteúdo substituído com ' + totalPastas + ' pastas.';
               scanSt.style.color = 'var(--cyan)';
             };
           } else {
             conteudoEl.value = lista;
             conteudoEl.dispatchEvent(new Event('input'));
-            scanSt.textContent = '✓ ' + pastas.length + ' pastas de "' + handle.name + '" adicionadas.';
+            scanSt.textContent = '✓ ' + totalPastas + ' pastas de "' + handle.name + '" adicionadas.';
             scanSt.style.color = 'var(--cyan)';
           }
           scanBtn.disabled = false;
