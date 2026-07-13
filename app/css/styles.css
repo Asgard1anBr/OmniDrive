@@ -67,8 +67,11 @@ input, textarea, select{color:#fff;}
 input::placeholder, textarea::placeholder{color:#8aa0b0;}
 input[type="date"],input[type="month"],input[type="number"],select{color-scheme:dark;}
 input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="month"]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(2);cursor:pointer;}
+input[type="month"]::-webkit-calendar-picker-indicator{filter:invert(1) sepia(1) saturate(5) hue-rotate(145deg) brightness(1.2);cursor:pointer;width:20px;height:20px;}
 input[type="month"]{min-height:48px;}
+.month-empty::-webkit-datetime-edit{color:transparent !important;}
+.month-empty::before{content:'Selecione o mês';color:#8aa0b0;position:absolute;pointer-events:none;}
+.month-empty{position:relative;}
 .filter-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
 .fpill{font-size:13px;padding:6px 13px;border-radius:20px;border:1px solid rgba(120,160,180,.24);
   color:#8ba6b8;background:none;cursor:pointer;}
@@ -189,6 +192,11 @@ select.field option{background:#0b1a26;color:#fff;}
 .btn-add{white-space:nowrap;background:rgba(46,230,224,.08);border:1px solid var(--line-cyan);color:var(--cyan-lt);
   border-radius:11px;padding:0 15px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
 .btn-add:hover{background:rgba(46,230,224,.18);color:#eafeff;}
+.btn-scan{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:12px 18px;margin-bottom:10px;border-radius:12px;font-size:14px;font-weight:600;
+  font-family:inherit;cursor:pointer;color:var(--cyan-lt);
+  background:rgba(46,230,224,.06);border:1px dashed var(--line-cyan);}
+.btn-scan:hover{background:rgba(46,230,224,.14);border-style:solid;}
 .form-actions{display:flex;gap:12px;margin-top:24px;}
 .btn{flex:1;text-align:center;padding:14px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;
   border:none;font-family:inherit;color:#04202a;background:linear-gradient(180deg,#39efe7,#22c6c0);

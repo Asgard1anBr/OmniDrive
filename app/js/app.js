@@ -16,10 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.1.4';
+  const VERSAO = '2.1.5';
   const CHANGELOG = [
-    { v: '2.1.4', data: '2026-07-13', itens: [
-      'Campo de aquisição limpo (sem tracinhos quando vazio).',
+    { v: '2.1.5', data: '2026-07-13', itens: [
+      'Ícone do calendário agora em ciano (cor do app).',
+      'Campo de aquisição limpo — placeholder quando vazio, sem tracinhos.',
+      'Botão "Escanear pastas" redesenhado — maior, centralizado, borda tracejada.',
       'Quadrado no canto da barra de rolagem removido.'
     ]},
     { v: '2.1.3', data: '2026-07-13', itens: [
@@ -96,7 +98,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.1.4', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.1.5', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -737,13 +739,13 @@
       </div>
 
       <label class="flabel">Aquisição <em>opcional</em></label>
-      <input class="field" id="f-aquisicao" type="${d.aquisicao ? 'month' : 'text'}" ${d.aquisicao ? `value="${esc(d.aquisicao)}"` : 'placeholder="Selecione o mês"'} readonly onfocus="if(this.type==='text'){this.type='month';this.removeAttribute('readonly');this.showPicker?.()}" onblur="if(!this.value){this.type='text';this.placeholder='Selecione o mês';this.setAttribute('readonly','')}">
+      <input class="field${d.aquisicao ? '' : ' month-empty'}" id="f-aquisicao" type="month" value="${esc(d.aquisicao || '')}" onchange="this.classList.toggle('month-empty',!this.value)">
 
       <label class="flabel">Tipos de arquivo</label>
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}
 
       <label class="flabel">Conteúdo <em>lista, vírgulas, do seu jeito</em></label>
-            <button type="button" class="btn-add" id="scan-dir" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:5px">📂 Escanear pastas do drive</button>
+      <button type="button" class="btn-scan" id="scan-dir">📂 Escanear pastas do drive</button>
       <input type="file" id="scan-fallback" webkitdirectory multiple hidden>
       <textarea class="field" id="f-conteudo" placeholder="Casamento fotos RAW 2019, Fotos viagem Chile…">${esc(d.conteudo || '')}</textarea>
       <div class="muted" id="scan-status" style="font-size:11px;min-height:14px;margin-top:4px"></div>
