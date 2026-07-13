@@ -16,12 +16,16 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.1';
+  const VERSAO = '2.1.1';
   const CHANGELOG = [
+    { v: '2.1.1', data: '2026-07-13', itens: [
+      'Escanear drive: formato linear (pastas separadas por vírgula) — funciona com a busca.',
+      'Se já existe conteúdo, pergunta se quer juntar ou substituir antes de aplicar.',
+      'Texto guia pede pra selecionar o drive externo (não o disco local).'
+    ]},
     { v: '2.1', data: '2026-07-13', itens: [
-      'Novo: Escanear drive — botão 📂 no cadastro lê a árvore de pastas do drive plugado e preenche o campo de conteúdo.',
-      'Exibe a árvore com formatação visual (├── └──), até 3 níveis de profundidade.',
-      'Conteúdo escaneado é editável livremente após o scan.'
+      'Novo: Escanear drive — botão 📂 no cadastro lê as pastas do drive plugado e preenche o campo de conteúdo.',
+      'Até 3 níveis de profundidade. Conteúdo editável livremente após o scan.'
     ]},
     { v: '2.0', data: '2026-07-13', itens: [
       'Novo: Painel (Dashboard) com estatísticas, distribuição por tipo e local, drives mais cheios.',
@@ -81,7 +85,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.1.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -728,7 +732,7 @@
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}
 
       <label class="flabel">Conteúdo <em>lista, vírgulas, do seu jeito</em></label>
-      ${'showDirectoryPicker' in window ? `<button type="button" class="btn-add" id="scan-dir" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:5px">📂 Escanear drive</button>` : ''}
+      ${'showDirectoryPicker' in window ? `<button type="button" class="btn-add" id="scan-dir" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:5px">📂 Escanear pastas do drive</button>` : ''}
       <textarea class="field" id="f-conteudo" placeholder="Casamento fotos RAW 2019, Fotos viagem Chile…">${esc(d.conteudo || '')}</textarea>
       <div class="muted" id="scan-status" style="font-size:11px;min-height:14px;margin-top:4px"></div>
 
@@ -781,54 +785,69 @@
       scanBtn.addEventListener('click', async () => {
         const scanSt = el.querySelector('#scan-status');
         try {
+          scanSt.textContent = 'Selecione a pasta raiz do drive externo (pen drive, HD externo etc.)…';
+          scanSt.style.color = 'var(--txt-mid)';
           const handle = await window.showDirectoryPicker({ mode: 'read' });
-          scanSt.textContent = 'Lendo pastas…';
+          scanSt.textContent = 'Lendo pastas de "' + handle.name + '"…';
           scanBtn.disabled = true;
 
-          async function lerArvore(dirHandle, profundidade, maxProf) {
-            const itens = [];
+          async function listarPastas(dirHandle, prof, max) {
+            const nomes = [];
             for await (const [nome, entry] of dirHandle.entries()) {
-              if (nome.startsWith('.')) continue;
+              if (nome.startsWith('.') || nome.startsWith('$')) continue;
               if (entry.kind === 'directory') {
-                const filhos = profundidade < maxProf ? await lerArvore(entry, profundidade + 1, maxProf) : [];
-                itens.push({ nome, filhos });
-              } else {
-                itens.push({ nome, filhos: null });
+                nomes.push(nome);
+                if (prof < max) {
+                  const sub = await listarPastas(entry, prof + 1, max);
+                  sub.forEach(s => nomes.push(nome + ' > ' + s));
+                }
               }
             }
-            itens.sort((a, b) => {
-              if (a.filhos !== null && b.filhos === null) return -1;
-              if (a.filhos === null && b.filhos !== null) return 1;
-              return a.nome.localeCompare(b.nome);
-            });
-            return itens;
+            return nomes.sort((a, b) => a.localeCompare(b));
           }
 
-          function formatar(itens, prefixo) {
-            return itens.map((item, i) => {
-              const ultimo = i === itens.length - 1;
-              const conector = ultimo ? '└── ' : '├── ';
-              const linha = prefixo + conector + item.nome;
-              if (item.filhos && item.filhos.length) {
-                const novoP = prefixo + (ultimo ? '    ' : '│   ');
-                return linha + '\n' + formatar(item.filhos, novoP);
-              }
-              return linha;
-            }).join('\n');
+          const pastas = await listarPastas(handle, 0, 2);
+          if (!pastas.length) {
+            scanSt.textContent = 'Nenhuma pasta encontrada em "' + handle.name + '".';
+            scanSt.style.color = 'var(--warn)';
+            scanBtn.disabled = false;
+            return;
           }
 
-          const arvore = await lerArvore(handle, 0, 2);
-          const texto = handle.name + '/\n' + formatar(arvore, '');
-
-          const totalPastas = (function contar(arr) { return arr.reduce((s, i) => s + (i.filhos ? 1 + contar(i.filhos) : 0), 0); })(arvore);
-          const totalArquivos = (function contar(arr) { return arr.reduce((s, i) => s + (i.filhos === null ? 1 : contar(i.filhos)), 0); })(arvore);
-
+          const lista = pastas.join(', ');
           const conteudoEl = el.querySelector('#f-conteudo');
           const atual = conteudoEl.value.trim();
-          conteudoEl.value = atual ? atual + '\n\n--- Árvore escaneada ---\n' + texto : texto;
-          conteudoEl.dispatchEvent(new Event('input'));
-          scanSt.textContent = '✓ ' + totalPastas + ' pastas e ' + totalArquivos + ' arquivos encontrados (até 3 níveis).';
-          scanSt.style.color = 'var(--cyan)';
+
+          if (atual) {
+            const m2 = modal(`<h3>Conteúdo já preenchido</h3>
+              <p class="muted" style="font-size:13px">O campo de conteúdo já tem texto. O que deseja fazer com as <b style="color:#fff">${pastas.length} pastas</b> encontradas em "${esc(handle.name)}"?</p>
+              <div style="max-height:140px;overflow-y:auto;background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin:12px 0;font-size:12px;color:var(--txt-mid);line-height:1.6">${esc(lista)}</div>
+              <div class="form-actions">
+                <button type="button" class="btn ghost" id="m-cancel">Cancelar</button>
+                <button type="button" class="btn ghost" id="m-juntar">Juntar ao existente</button>
+                <button type="button" class="btn" id="m-subst">Substituir tudo</button>
+              </div>`);
+            m2.querySelector('#m-cancel').onclick = () => { m2.remove(); scanSt.textContent = ''; };
+            m2.querySelector('#m-juntar').onclick = () => {
+              conteudoEl.value = atual + ', ' + lista;
+              conteudoEl.dispatchEvent(new Event('input'));
+              m2.remove();
+              scanSt.textContent = '✓ ' + pastas.length + ' pastas adicionadas ao conteúdo existente.';
+              scanSt.style.color = 'var(--cyan)';
+            };
+            m2.querySelector('#m-subst').onclick = () => {
+              conteudoEl.value = lista;
+              conteudoEl.dispatchEvent(new Event('input'));
+              m2.remove();
+              scanSt.textContent = '✓ Conteúdo substituído com ' + pastas.length + ' pastas.';
+              scanSt.style.color = 'var(--cyan)';
+            };
+          } else {
+            conteudoEl.value = lista;
+            conteudoEl.dispatchEvent(new Event('input'));
+            scanSt.textContent = '✓ ' + pastas.length + ' pastas de "' + handle.name + '" adicionadas.';
+            scanSt.style.color = 'var(--cyan)';
+          }
           scanBtn.disabled = false;
         } catch (e) {
           if (e.name === 'AbortError') { scanSt.textContent = ''; }
