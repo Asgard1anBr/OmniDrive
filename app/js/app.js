@@ -739,7 +739,10 @@
       </div>
 
       <label class="flabel">Aquisição <em>opcional</em></label>
-      <input class="field${d.aquisicao ? '' : ' month-empty'}" id="f-aquisicao" type="month" value="${esc(d.aquisicao || '')}" onchange="this.classList.toggle('month-empty',!this.value)">
+      <div class="month-wrap">
+        <span class="month-ph"${d.aquisicao ? ' style="opacity:0"' : ''}>Selecione o mês</span>
+        <input class="field${d.aquisicao ? '' : ' month-empty'}" id="f-aquisicao" type="month" value="${esc(d.aquisicao || '')}" onchange="this.classList.toggle('month-empty',!this.value);this.previousElementSibling.style.opacity=this.value?'0':'1'">
+      </div>
 
       <label class="flabel">Tipos de arquivo</label>
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}
