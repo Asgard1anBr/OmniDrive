@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.1.3';
+  const VERSAO = '2.1.4';
   const CHANGELOG = [
+    { v: '2.1.4', data: '2026-07-13', itens: [
+      'Campo de aquisição limpo (sem tracinhos quando vazio).',
+      'Quadrado no canto da barra de rolagem removido.'
+    ]},
     { v: '2.1.3', data: '2026-07-13', itens: [
       'Escanear drive agora funciona no Brave e outros browsers (fallback via seletor de pasta).',
       'Ícone do calendário de aquisição corrigido (agora branco).'
@@ -92,7 +96,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.1.3', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.1.4', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -733,7 +737,7 @@
       </div>
 
       <label class="flabel">Aquisição <em>opcional</em></label>
-      <input class="field" id="f-aquisicao" type="month" value="${esc(d.aquisicao || '')}">
+      <input class="field" id="f-aquisicao" type="${d.aquisicao ? 'month' : 'text'}" ${d.aquisicao ? `value="${esc(d.aquisicao)}"` : 'placeholder="Selecione o mês"'} readonly onfocus="if(this.type==='text'){this.type='month';this.removeAttribute('readonly');this.showPicker?.()}" onblur="if(!this.value){this.type='text';this.placeholder='Selecione o mês';this.setAttribute('readonly','')}">
 
       <label class="flabel">Tipos de arquivo</label>
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}

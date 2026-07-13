@@ -13,6 +13,7 @@
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--cyan);border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--cyan-lt);}
+::-webkit-scrollbar-corner{background:transparent;}
 html{scrollbar-width:thin;scrollbar-color:var(--cyan) transparent;}
 html,body{margin:0;height:100%;}
 body{
@@ -66,7 +67,8 @@ input, textarea, select{color:#fff;}
 input::placeholder, textarea::placeholder{color:#8aa0b0;}
 input[type="date"],input[type="month"],input[type="number"],select{color-scheme:dark;}
 input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="month"]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(2);}
+input[type="month"]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(2);cursor:pointer;}
+input[type="month"]{min-height:48px;}
 .filter-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
 .fpill{font-size:13px;padding:6px 13px;border-radius:20px;border:1px solid rgba(120,160,180,.24);
   color:#8ba6b8;background:none;cursor:pointer;}
