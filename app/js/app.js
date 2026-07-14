@@ -16,12 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.3.1';
+  const VERSAO = '2.3.2';
   const CHANGELOG = [
-    { v: '2.3.1', data: '2026-07-13', itens: [
-      'S.M.A.R.T. salvo no drive — badge de saúde nos cards e dashboard.',
-      'Verificação salva score, temperatura, horas e setores no catálogo.',
-      'Badge 🔧 com percentual colorido aparece em lista, galeria e top drives.'
+    { v: '2.3.2', data: '2026-07-13', itens: [
+      'Botão S.M.A.R.T. movido para tela de edição/novo drive.',
+      'Data da última verificação salva e exibida em detalhe e tooltip do badge.',
+      'Tela de detalhe mostra resumo S.M.A.R.T. salvo (sem botão — editar para re-verificar).'
     ]},
     { v: '2.3', data: '2026-07-13', itens: [
       'S.M.A.R.T. — verificação de saúde do drive via companion local.',
@@ -118,7 +118,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.3.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.3.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -547,7 +547,8 @@
   function smartBadge(d) {
     if (!d.smart || d.smart.score == null) return '';
     const s = d.smart.score, c = smartScoreColor(s);
-    return `<span class="smart-badge" style="color:${c}" title="S.M.A.R.T. ${s}% — ${smartScoreLabel(s)}">🔧${s}%</span>`;
+    const dt = d.smart.checkedAt ? ' (' + new Date(d.smart.checkedAt).toLocaleDateString('pt-BR') + ')' : '';
+    return `<span class="smart-badge" style="color:${c}" title="S.M.A.R.T. ${s}% — ${smartScoreLabel(s)}${dt}">🔧${s}%</span>`;
   }
 
   function cardHtml(d, gallery) {
@@ -853,15 +854,10 @@
       <div class="hint">Conteúdo</div>
       ${temArvore ? '<div id="detail-tree"></div>' : `<div class="content-list">${linhas}</div>`}
       ${d.observacoes ? `<div class="hint">Observações</div><div class="muted" style="font-size:13px">${esc(d.observacoes)}</div>` : ''}
-      <div class="hint">S.M.A.R.T.</div>
-      <div id="smart-section" class="smart-section">
-        <button type="button" class="btn-scan" id="smart-check">🔧 Verificar saúde do drive</button>
-      </div>
+      ${d.smart && d.smart.score != null ? `<div class="hint">S.M.A.R.T.</div><div class="smart-section"><div class="smart-saved"><span style="color:${smartScoreColor(d.smart.score)};font-weight:700;font-size:16px">🔧 ${d.smart.score}% — ${smartScoreLabel(d.smart.score)}</span>${d.smart.temperature != null ? ` · 🌡️ ${d.smart.temperature}°C` : ''}${d.smart.powerOnHours != null ? ` · ⏱️ ${d.smart.powerOnHours.toLocaleString()}h` : ''}${d.smart.health ? ` · ${d.smart.health === 'PASSED' ? '✅' : '❌'} ${d.smart.health}` : ''}${d.smart.reallocated ? `<div style="color:var(--warn);font-size:12px;margin-top:4px">⚠️ ${d.smart.reallocated} setores realocados</div>` : ''}${d.smart.checkedAt ? `<div class="muted" style="font-size:11px;margin-top:4px">Última verificação: ${new Date(d.smart.checkedAt).toLocaleString('pt-BR')}</div>` : ''}</div></div>` : ''}
       <button class="btn-remove-small" id="remover">Remover drive</button>`;
 
     if (temArvore) renderTreeReadonly(el.querySelector('#detail-tree'), d.conteudo);
-
-    document.getElementById('smart-check').addEventListener('click', () => fetchSmart(d, el.querySelector('#smart-section')));
     document.getElementById('back').addEventListener('click', () => go('busca'));
     document.getElementById('editar').addEventListener('click', () => { state.editId = d.id; go('cadastro'); });
     document.getElementById('qr').addEventListener('click', () => abrirQR(d));
@@ -972,6 +968,12 @@
       <input class="field" id="f-tags" value="${esc((d.tags || []).join(', '))}" placeholder="Fotos família, Cliente X" autocomplete="off">
       <div class="tag-suggestions" id="tag-sug"></div>
 
+      <label class="flabel">S.M.A.R.T.</label>
+      <div id="smart-form-section">
+        <button type="button" class="btn-scan" id="smart-check-form">🔧 Verificar saúde do drive</button>
+        ${d.smart && d.smart.score != null ? `<div class="smart-saved" style="margin-top:8px"><span style="color:${smartScoreColor(d.smart.score)};font-weight:700">🔧 ${d.smart.score}% — ${smartScoreLabel(d.smart.score)}</span>${d.smart.temperature != null ? ` · 🌡️ ${d.smart.temperature}°C` : ''}${d.smart.powerOnHours != null ? ` · ⏱️ ${d.smart.powerOnHours.toLocaleString()}h` : ''}${d.smart.checkedAt ? `<div class="muted" style="font-size:11px;margin-top:4px">Última verificação: ${new Date(d.smart.checkedAt).toLocaleString('pt-BR')}</div>` : ''}</div>` : ''}
+      </div>
+
       <label class="flabel">Observações <em>opcional</em></label>
       <textarea class="field" id="f-obs" placeholder="Notas…">${esc(d.observacoes || '')}</textarea>
 
@@ -1010,6 +1012,38 @@
     el.querySelector('#add-local').addEventListener('click', () => abrirNovoLocal(el.querySelector('#f-local')));
     el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
+    el.querySelector('#smart-check-form').addEventListener('click', async () => {
+      const section = el.querySelector('#smart-form-section');
+      const btn = el.querySelector('#smart-check-form');
+      btn.disabled = true; btn.textContent = '🔄 Consultando…';
+      try {
+        const r = await fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(5000) });
+        const data = await r.json();
+        if (!data.ok || !data.drives || !data.drives.length) {
+          btn.textContent = '🔧 Verificar saúde do drive'; btn.disabled = false;
+          section.insertAdjacentHTML('beforeend', '<div class="muted" style="font-size:12px;margin-top:6px">Nenhum drive S.M.A.R.T. detectado.</div>');
+          return;
+        }
+        const serial = (d.serial || el.querySelector('#f-serial')?.value || '').toLowerCase().trim();
+        const modelo = (d.modelo || el.querySelector('#f-modelo')?.value || '').toLowerCase().trim();
+        let match = null;
+        if (serial) match = data.drives.find(s => (s.serial || '').toLowerCase().trim() === serial);
+        if (!match && modelo) match = data.drives.find(s => (s.model || '').toLowerCase().includes(modelo));
+        if (!match && data.drives.length === 1) match = data.drives[0];
+        if (match) {
+          d.smart = { score: match.score, health: match.health, temperature: match.temperature, powerOnHours: match.powerOnHours, reallocated: match.reallocated || 0, pending: match.pending || 0, uncorrectable: match.uncorrectable || 0, model: match.model, checkedAt: new Date().toISOString() };
+          const c = smartScoreColor(match.score);
+          section.innerHTML = `<button type="button" class="btn-scan" id="smart-check-form">🔧 Verificar saúde do drive</button><div class="smart-saved" style="margin-top:8px"><span style="color:${c};font-weight:700">🔧 ${match.score}% — ${smartScoreLabel(match.score)}</span>${match.temperature != null ? ' · 🌡️ ' + match.temperature + '°C' : ''}${match.powerOnHours != null ? ' · ⏱️ ' + match.powerOnHours.toLocaleString() + 'h' : ''}<div class="muted" style="font-size:11px;margin-top:4px">Verificado agora — ${new Date().toLocaleString('pt-BR')}</div></div>`;
+          el.querySelector('#smart-check-form').addEventListener('click', arguments.callee);
+        } else {
+          section.innerHTML = `<button type="button" class="btn-scan" id="smart-check-form">🔧 Verificar saúde do drive</button><div class="muted" style="font-size:12px;margin-top:6px">Nenhum drive corresponde. Preencha Marca/Modelo ou Nº de série.<br><b style="font-size:11px">Detectados:</b> ${data.drives.map(s => esc(s.model || s.device)).join(', ')}</div>`;
+          el.querySelector('#smart-check-form').addEventListener('click', arguments.callee);
+        }
+      } catch (e) {
+        btn.textContent = '🔧 Verificar saúde do drive'; btn.disabled = false;
+        section.insertAdjacentHTML('beforeend', '<div style="font-size:12px;color:var(--warn);margin-top:6px">Companion não detectado. Rode iniciar-smart.bat primeiro.</div>');
+      }
+    });
 
     // --- árvore colapsável de pastas (formulário) ---
     function renderTreeForm(container, texto) {
