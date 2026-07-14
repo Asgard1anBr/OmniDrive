@@ -1,5 +1,6 @@
 /* ===== OmniDrive — design system (noturno / HUD) ===== */
 :root{
+  color-scheme:dark;
   --bg0:#081019; --bg1:#0b1a26; --panel:#12222f;
   --cyan:#2ee6e0; --cyan-lt:#8ffcf6; --blue:#3a7bd5;
   --txt:#eafeff; --txt-soft:#7f96a8; --txt-mid:#b9cdd9;

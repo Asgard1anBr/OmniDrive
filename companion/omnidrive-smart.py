@@ -43,6 +43,29 @@ def find_smartctl():
 
 SMARTCTL = find_smartctl()
 
+def get_drive_letters():
+    """Maps physical drive index to list of drive letters (Windows only)."""
+    if os.name != 'nt':
+        return {}
+    mapping = {}
+    try:
+        r = subprocess.run(
+            ['powershell', '-NoProfile', '-Command',
+             'Get-Partition | Where-Object DriveLetter | Select-Object DiskNumber, DriveLetter | ConvertTo-Json'],
+            capture_output=True, text=True, timeout=10
+        )
+        data = json.loads(r.stdout)
+        if isinstance(data, dict):
+            data = [data]
+        for item in data:
+            disk = item.get('DiskNumber')
+            letter = item.get('DriveLetter')
+            if disk is not None and letter:
+                mapping.setdefault(disk, []).append(letter)
+    except Exception:
+        pass
+    return mapping
+
 def list_drives():
     if not SMARTCTL:
         return []
@@ -173,6 +196,13 @@ class SmartHandler(http.server.BaseHTTPRequestHandler):
         if self.path == '/smart' or self.path.startswith('/smart?'):
             drives = list_drives()
             results = [parse_smart(d) for d in drives]
+            letter_map = get_drive_letters()
+            for r in results:
+                dev = r.get('device', '')
+                m = re.search(r'/dev/sd([a-z])', dev) or re.search(r'pd(\d+)', dev)
+                if m:
+                    idx = ord(m.group(1)) - ord('a') if m.group(1).isalpha() else int(m.group(1))
+                    r['letters'] = letter_map.get(idx, [])
             self.wfile.write(json.dumps({
                 'ok': True,
                 'smartctl': SMARTCTL or None,

@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.4.2';
+  const VERSAO = '2.5.0';
   const CHANGELOG = [
+    { v: '2.5.0', data: '2026-07-13', itens: [
+      'S.M.A.R.T.: drives agora mostram letras de unidade (C:, D:) para fácil identificação.',
+      'Calendário de aquisição com tema escuro (color-scheme global).'
+    ]},
     { v: '2.4.2', data: '2026-07-13', itens: [
       'Seleção manual de drives S.M.A.R.T. agora funciona (preenche campos e mostra saúde).',
       'Badge "🔧 —" nos cards quando S.M.A.R.T. não foi escaneado.'
@@ -135,7 +139,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.4.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.5.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -1058,7 +1062,11 @@
           if (match) {
             smartApply(match);
           } else {
-            smartRender(`<div class="muted" style="font-size:12px;margin-top:6px">Selecione o drive correspondente:</div><div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${data.drives.map((s, i) => `<button type="button" class="btn-scan smart-pick" data-idx="${i}" style="font-size:12px;padding:8px">${esc(s.model || s.device)}${s.serial ? ' — ' + esc(s.serial) : ''}</button>`).join('')}</div>`);
+            const pickHtml = data.drives.map((s, i) => {
+              const letters = s.letters && s.letters.length ? ' (' + s.letters.map(l => l + ':').join(', ') + ')' : '';
+              return `<button type="button" class="btn-scan smart-pick" data-idx="${i}" style="font-size:12px;padding:8px">${esc(s.model || s.device)}${letters}${s.serial ? ' — ' + esc(s.serial) : ''}</button>`;
+            }).join('');
+            smartRender(`<div class="muted" style="font-size:12px;margin-top:6px">Selecione o drive:</div><div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${pickHtml}</div>`);
             el.querySelector('#smart-form-section').querySelectorAll('.smart-pick').forEach(b => b.addEventListener('click', () => smartApply(data.drives[+b.dataset.idx])));
           }
         })
