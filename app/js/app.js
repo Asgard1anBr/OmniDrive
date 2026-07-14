@@ -735,15 +735,17 @@
       if (e.name === 'TimeoutError' || e.message.includes('fetch')) {
         container.innerHTML = `
           <div class="smart-offline">
-            <div style="font-size:14px;margin-bottom:8px">⚠️ Companion não detectado</div>
-            <div class="muted" style="font-size:12px;margin-bottom:12px">
-              Para ver a saúde S.M.A.R.T., rode o companion no computador onde o drive está plugado.
+            <div style="font-size:15px;margin-bottom:10px">⚠️ Companion não detectado</div>
+            <div class="muted" style="font-size:13px;margin-bottom:14px">
+              Para ver a saúde S.M.A.R.T., é preciso rodar um pequeno programa neste computador.<br>
+              Só precisa fazer isso uma vez por máquina.
             </div>
             <div class="smart-steps">
-              <div>1. Instale o <a href="https://www.smartmontools.org/wiki/Download" target="_blank" style="color:var(--cyan)">smartmontools</a></div>
-              <div>2. Baixe o <a href="https://github.com/Asgard1anBr/OmniDrive/tree/main/companion" target="_blank" style="color:var(--cyan)">companion</a></div>
-              <div>3. Execute: <code style="color:var(--cyan-lt)">python omnidrive-smart.py</code></div>
-              <div>4. Clique em "Verificar saúde" novamente</div>
+              <div><b style="color:var(--cyan-lt)">Passo 1</b> — Instale o <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--cyan)">Python</a> (marque "Add to PATH")</div>
+              <div><b style="color:var(--cyan-lt)">Passo 2</b> — Instale o <a href="https://www.smartmontools.org/wiki/Download" target="_blank" style="color:var(--cyan)">smartmontools</a> (lê dados S.M.A.R.T. dos discos)</div>
+              <div><b style="color:var(--cyan-lt)">Passo 3</b> — Baixe a pasta <a href="https://github.com/Asgard1anBr/OmniDrive/tree/main/companion" target="_blank" style="color:var(--cyan)">companion</a> do repositório</div>
+              <div><b style="color:var(--cyan-lt)">Passo 4</b> — Dê duplo clique em <code style="color:var(--cyan-lt)">iniciar-smart.bat</code> (pede admin automaticamente)</div>
+              <div><b style="color:var(--cyan-lt)">Passo 5</b> — Volte aqui e clique "Verificar saúde" novamente</div>
             </div>
           </div>`;
       } else {
