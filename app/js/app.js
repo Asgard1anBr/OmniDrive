@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.4.0';
+  const VERSAO = '2.4.1';
   const CHANGELOG = [
+    { v: '2.4.1', data: '2026-07-13', itens: [
+      'S.M.A.R.T. movido para o topo do formulário.',
+      'Campo de mês sem tracinhos (abre calendário ao clicar).'
+    ]},
     { v: '2.4.0', data: '2026-07-13', itens: [
       'S.M.A.R.T.: seleção manual de drive quando não há correspondência automática.',
       'Auto-preenchimento de Nº de série e Marca/Modelo a partir do S.M.A.R.T.',
@@ -127,7 +131,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.4.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.4.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
