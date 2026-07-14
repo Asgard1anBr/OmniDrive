@@ -70,9 +70,8 @@ input[type="date"],input[type="month"],input[type="number"],select{color-scheme:
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="month"]::-webkit-calendar-picker-indicator{filter:brightness(0) invert(1);cursor:pointer;width:20px;height:20px;opacity:.7;}
 input[type="month"]{min-height:48px;}
-.month-wrap{position:relative;}
-.month-wrap .month-ph{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#8aa0b0;font-size:15px;pointer-events:none;transition:opacity .2s;}
-.month-empty::-webkit-datetime-edit{color:transparent !important;}
+input[type="month"]::-webkit-datetime-edit{color:transparent;}
+input[type="month"].month-filled::-webkit-datetime-edit{color:inherit;}
 .filter-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
 .fpill{font-size:13px;padding:6px 13px;border-radius:20px;border:1px solid rgba(120,160,180,.24);
   color:#8ba6b8;background:none;cursor:pointer;}

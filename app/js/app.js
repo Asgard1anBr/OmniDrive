@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.3.2';
+  const VERSAO = '2.3.3';
   const CHANGELOG = [
+    { v: '2.3.3', data: '2026-07-13', itens: [
+      'Corrigido empilhamento de mensagens ao clicar S.M.A.R.T. várias vezes.',
+      'Corrigido placeholder do campo de mês (não exibe mais texto selecionável).'
+    ]},
     { v: '2.3.2', data: '2026-07-13', itens: [
       'Botão S.M.A.R.T. movido para tela de edição/novo drive.',
       'Data da última verificação salva e exibida em detalhe e tooltip do badge.',
@@ -118,7 +122,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.3.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.3.3', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -949,10 +953,7 @@
       </div>
 
       <label class="flabel">Aquisição <em>opcional</em></label>
-      <div class="month-wrap">
-        <span class="month-ph"${d.aquisicao ? ' style="opacity:0"' : ''}>Selecione o mês</span>
-        <input class="field${d.aquisicao ? '' : ' month-empty'}" id="f-aquisicao" type="month" value="${esc(d.aquisicao || '')}" onchange="this.classList.toggle('month-empty',!this.value);this.previousElementSibling.style.opacity=this.value?'0':'1'">
-      </div>
+      <input class="field${d.aquisicao ? ' month-filled' : ''}" id="f-aquisicao" type="month" value="${esc(d.aquisicao || '')}" onchange="this.classList.toggle('month-filled',!!this.value)">
 
       <label class="flabel">Tipos de arquivo</label>
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}
@@ -1012,38 +1013,40 @@
     el.querySelector('#add-local').addEventListener('click', () => abrirNovoLocal(el.querySelector('#f-local')));
     el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
-    el.querySelector('#smart-check-form').addEventListener('click', async () => {
+    function smartFormCheck() {
       const section = el.querySelector('#smart-form-section');
+      function smartMsg(html) {
+        section.innerHTML = '<button type="button" class="btn-scan" id="smart-check-form">🔧 Verificar saúde do drive</button>' + html;
+        el.querySelector('#smart-check-form').addEventListener('click', smartFormCheck);
+      }
       const btn = el.querySelector('#smart-check-form');
       btn.disabled = true; btn.textContent = '🔄 Consultando…';
-      try {
-        const r = await fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(5000) });
-        const data = await r.json();
-        if (!data.ok || !data.drives || !data.drives.length) {
-          btn.textContent = '🔧 Verificar saúde do drive'; btn.disabled = false;
-          section.insertAdjacentHTML('beforeend', '<div class="muted" style="font-size:12px;margin-top:6px">Nenhum drive S.M.A.R.T. detectado.</div>');
-          return;
-        }
-        const serial = (d.serial || el.querySelector('#f-serial')?.value || '').toLowerCase().trim();
-        const modelo = (d.modelo || el.querySelector('#f-modelo')?.value || '').toLowerCase().trim();
-        let match = null;
-        if (serial) match = data.drives.find(s => (s.serial || '').toLowerCase().trim() === serial);
-        if (!match && modelo) match = data.drives.find(s => (s.model || '').toLowerCase().includes(modelo));
-        if (!match && data.drives.length === 1) match = data.drives[0];
-        if (match) {
-          d.smart = { score: match.score, health: match.health, temperature: match.temperature, powerOnHours: match.powerOnHours, reallocated: match.reallocated || 0, pending: match.pending || 0, uncorrectable: match.uncorrectable || 0, model: match.model, checkedAt: new Date().toISOString() };
-          const c = smartScoreColor(match.score);
-          section.innerHTML = `<button type="button" class="btn-scan" id="smart-check-form">🔧 Verificar saúde do drive</button><div class="smart-saved" style="margin-top:8px"><span style="color:${c};font-weight:700">🔧 ${match.score}% — ${smartScoreLabel(match.score)}</span>${match.temperature != null ? ' · 🌡️ ' + match.temperature + '°C' : ''}${match.powerOnHours != null ? ' · ⏱️ ' + match.powerOnHours.toLocaleString() + 'h' : ''}<div class="muted" style="font-size:11px;margin-top:4px">Verificado agora — ${new Date().toLocaleString('pt-BR')}</div></div>`;
-          el.querySelector('#smart-check-form').addEventListener('click', arguments.callee);
-        } else {
-          section.innerHTML = `<button type="button" class="btn-scan" id="smart-check-form">🔧 Verificar saúde do drive</button><div class="muted" style="font-size:12px;margin-top:6px">Nenhum drive corresponde. Preencha Marca/Modelo ou Nº de série.<br><b style="font-size:11px">Detectados:</b> ${data.drives.map(s => esc(s.model || s.device)).join(', ')}</div>`;
-          el.querySelector('#smart-check-form').addEventListener('click', arguments.callee);
-        }
-      } catch (e) {
-        btn.textContent = '🔧 Verificar saúde do drive'; btn.disabled = false;
-        section.insertAdjacentHTML('beforeend', '<div style="font-size:12px;color:var(--warn);margin-top:6px">Companion não detectado. Rode iniciar-smart.bat primeiro.</div>');
-      }
-    });
+      fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(5000) })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.ok || !data.drives || !data.drives.length) {
+            smartMsg('<div class="muted" style="font-size:12px;margin-top:6px">Companion conectado, mas nenhum drive S.M.A.R.T. detectado.</div>');
+            return;
+          }
+          const serial = (el.querySelector('#f-serial')?.value || d.serial || '').toLowerCase().trim();
+          const modelo = (el.querySelector('#f-modelo')?.value || d.modelo || '').toLowerCase().trim();
+          let match = null;
+          if (serial) match = data.drives.find(s => (s.serial || '').toLowerCase().trim() === serial);
+          if (!match && modelo) match = data.drives.find(s => (s.model || '').toLowerCase().includes(modelo));
+          if (!match && data.drives.length === 1) match = data.drives[0];
+          if (match) {
+            d.smart = { score: match.score, health: match.health, temperature: match.temperature, powerOnHours: match.powerOnHours, reallocated: match.reallocated || 0, pending: match.pending || 0, uncorrectable: match.uncorrectable || 0, model: match.model, checkedAt: new Date().toISOString() };
+            const c = smartScoreColor(match.score);
+            smartMsg(`<div class="smart-saved" style="margin-top:8px"><span style="color:${c};font-weight:700">🔧 ${match.score}% — ${smartScoreLabel(match.score)}</span>${match.temperature != null ? ' · 🌡️ ' + match.temperature + '°C' : ''}${match.powerOnHours != null ? ' · ⏱️ ' + match.powerOnHours.toLocaleString() + 'h' : ''}<div class="muted" style="font-size:11px;margin-top:4px">Verificado agora — ${new Date().toLocaleString('pt-BR')}</div></div>`);
+          } else {
+            smartMsg(`<div class="muted" style="font-size:12px;margin-top:6px">Nenhum drive corresponde. Preencha Marca/Modelo ou Nº de série.<br><b style="font-size:11px">Detectados:</b> ${data.drives.map(s => esc(s.model || s.device)).join(', ')}</div>`);
+          }
+        })
+        .catch(() => {
+          smartMsg('<div style="font-size:12px;color:var(--warn);margin-top:6px">Companion não detectado. Rode iniciar-smart.bat primeiro.</div>');
+        });
+    }
+    el.querySelector('#smart-check-form').addEventListener('click', smartFormCheck);
 
     // --- árvore colapsável de pastas (formulário) ---
     function renderTreeForm(container, texto) {
