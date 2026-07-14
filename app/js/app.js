@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.4.1';
+  const VERSAO = '2.4.2';
   const CHANGELOG = [
+    { v: '2.4.2', data: '2026-07-13', itens: [
+      'Seleção manual de drives S.M.A.R.T. agora funciona (preenche campos e mostra saúde).',
+      'Badge "🔧 —" nos cards quando S.M.A.R.T. não foi escaneado.'
+    ]},
     { v: '2.4.1', data: '2026-07-13', itens: [
       'S.M.A.R.T. movido para o topo do formulário.',
       'Campo de mês sem tracinhos (abre calendário ao clicar).'
@@ -131,7 +135,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.4.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.4.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -558,7 +562,7 @@
   }
 
   function smartBadge(d) {
-    if (!d.smart || d.smart.score == null) return '';
+    if (!d.smart || d.smart.score == null) return '<span class="smart-badge smart-none" title="S.M.A.R.T. não escaneado">🔧 —</span>';
     const s = d.smart.score, c = smartScoreColor(s);
     const dt = d.smart.checkedAt ? ' (' + new Date(d.smart.checkedAt).toLocaleDateString('pt-BR') + ')' : '';
     return `<span class="smart-badge" style="color:${c}" title="S.M.A.R.T. ${s}% — ${smartScoreLabel(s)}${dt}">🔧${s}%</span>`;
@@ -1022,19 +1026,27 @@
     el.querySelector('#add-local').addEventListener('click', () => abrirNovoLocal(el.querySelector('#f-local')));
     el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
-    function smartFormCheck() {
+    function smartApply(picked) {
+      d.smart = { score: picked.score, health: picked.health, temperature: picked.temperature, powerOnHours: picked.powerOnHours, reallocated: picked.reallocated || 0, pending: picked.pending || 0, uncorrectable: picked.uncorrectable || 0, model: picked.model, serial: picked.serial, checkedAt: new Date().toISOString() };
+      const fi = el.querySelector('#f-serial'), fm = el.querySelector('#f-modelo');
+      if (picked.serial && fi) { fi.value = picked.serial; d.serial = picked.serial; }
+      if (picked.model && fm) { fm.value = picked.model; d.modelo = picked.model; }
+      const c = smartScoreColor(picked.score);
+      smartRender(`<div class="smart-saved" style="margin-top:8px"><span style="color:${c};font-weight:700">🔧 ${picked.score}% — ${smartScoreLabel(picked.score)}</span>${picked.temperature != null ? ' · 🌡️ ' + picked.temperature + '°C' : ''}${picked.powerOnHours != null ? ' · ⏱️ ' + picked.powerOnHours.toLocaleString() + 'h' : ''}<div class="muted" style="font-size:11px;margin-top:4px">Verificado agora — ${new Date().toLocaleString('pt-BR')}</div></div>`);
+    }
+    function smartRender(html) {
       const section = el.querySelector('#smart-form-section');
-      function smartMsg(html) {
-        section.innerHTML = '<button type="button" class="btn-scan" id="smart-check-form">🔧 Escanear saúde e informações do dispositivo</button>' + html;
-        el.querySelector('#smart-check-form').addEventListener('click', smartFormCheck);
-      }
+      section.innerHTML = '<button type="button" class="btn-scan" id="smart-check-form">🔧 Escanear saúde e informações do dispositivo</button>' + html;
+      el.querySelector('#smart-check-form').addEventListener('click', smartFormCheck);
+    }
+    function smartFormCheck() {
       const btn = el.querySelector('#smart-check-form');
       btn.disabled = true; btn.textContent = '🔄 Consultando…';
       fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(5000) })
         .then(r => r.json())
         .then(data => {
           if (!data.ok || !data.drives || !data.drives.length) {
-            smartMsg('<div class="muted" style="font-size:12px;margin-top:6px">Companion conectado, mas nenhum drive S.M.A.R.T. detectado.</div>');
+            smartRender('<div class="muted" style="font-size:12px;margin-top:6px">Companion conectado, mas nenhum drive S.M.A.R.T. detectado.</div>');
             return;
           }
           const serial = (el.querySelector('#f-serial')?.value || d.serial || '').toLowerCase().trim();
@@ -1044,25 +1056,14 @@
           if (!match && modelo) match = data.drives.find(s => (s.model || '').toLowerCase().includes(modelo));
           if (!match && data.drives.length === 1) match = data.drives[0];
           if (match) {
-            d.smart = { score: match.score, health: match.health, temperature: match.temperature, powerOnHours: match.powerOnHours, reallocated: match.reallocated || 0, pending: match.pending || 0, uncorrectable: match.uncorrectable || 0, model: match.model, serial: match.serial, checkedAt: new Date().toISOString() };
-            if (match.serial) { const fi = el.querySelector('#f-serial'); if (fi && !fi.value) { fi.value = match.serial; d.serial = match.serial; } }
-            if (match.model) { const fm = el.querySelector('#f-modelo'); if (fm && !fm.value) { fm.value = match.model; d.modelo = match.model; } }
-            const c = smartScoreColor(match.score);
-            smartMsg(`<div class="smart-saved" style="margin-top:8px"><span style="color:${c};font-weight:700">🔧 ${match.score}% — ${smartScoreLabel(match.score)}</span>${match.temperature != null ? ' · 🌡️ ' + match.temperature + '°C' : ''}${match.powerOnHours != null ? ' · ⏱️ ' + match.powerOnHours.toLocaleString() + 'h' : ''}<div class="muted" style="font-size:11px;margin-top:4px">Verificado agora — ${new Date().toLocaleString('pt-BR')}</div></div>`);
+            smartApply(match);
           } else {
-            smartMsg(`<div class="muted" style="font-size:12px;margin-top:6px">Selecione o drive correspondente:</div><div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${data.drives.map((s, i) => `<button type="button" class="btn-scan smart-pick" data-idx="${i}" style="font-size:12px;padding:8px">${esc(s.model || s.device)}${s.serial ? ' — ' + esc(s.serial) : ''}</button>`).join('')}</div>`);
-            el.querySelectorAll('.smart-pick').forEach(b => b.addEventListener('click', () => {
-              const picked = data.drives[+b.dataset.idx];
-              d.smart = { score: picked.score, health: picked.health, temperature: picked.temperature, powerOnHours: picked.powerOnHours, reallocated: picked.reallocated || 0, pending: picked.pending || 0, uncorrectable: picked.uncorrectable || 0, model: picked.model, serial: picked.serial, checkedAt: new Date().toISOString() };
-              if (picked.serial) { const fi = el.querySelector('#f-serial'); if (fi) { fi.value = picked.serial; d.serial = picked.serial; } }
-              if (picked.model) { const fm = el.querySelector('#f-modelo'); if (fm) { fm.value = picked.model; d.modelo = picked.model; } }
-              const c = smartScoreColor(picked.score);
-              smartMsg(`<div class="smart-saved" style="margin-top:8px"><span style="color:${c};font-weight:700">🔧 ${picked.score}% — ${smartScoreLabel(picked.score)}</span>${picked.temperature != null ? ' · 🌡️ ' + picked.temperature + '°C' : ''}${picked.powerOnHours != null ? ' · ⏱️ ' + picked.powerOnHours.toLocaleString() + 'h' : ''}<div class="muted" style="font-size:11px;margin-top:4px">Verificado agora — ${new Date().toLocaleString('pt-BR')}</div></div>`);
-            }));
+            smartRender(`<div class="muted" style="font-size:12px;margin-top:6px">Selecione o drive correspondente:</div><div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${data.drives.map((s, i) => `<button type="button" class="btn-scan smart-pick" data-idx="${i}" style="font-size:12px;padding:8px">${esc(s.model || s.device)}${s.serial ? ' — ' + esc(s.serial) : ''}</button>`).join('')}</div>`);
+            el.querySelector('#smart-form-section').querySelectorAll('.smart-pick').forEach(b => b.addEventListener('click', () => smartApply(data.drives[+b.dataset.idx])));
           }
         })
         .catch(() => {
-          smartMsg('<div style="font-size:12px;color:var(--warn);margin-top:6px">Companion não detectado. Rode iniciar-smart.bat primeiro.</div>');
+          smartRender('<div style="font-size:12px;color:var(--warn);margin-top:6px">Companion não detectado. Rode iniciar-smart.bat primeiro.</div>');
         });
     }
     el.querySelector('#smart-check-form').addEventListener('click', smartFormCheck);
