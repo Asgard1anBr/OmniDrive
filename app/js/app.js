@@ -16,11 +16,11 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.2.2';
+  const VERSAO = '2.2.3';
   const CHANGELOG = [
-    { v: '2.2.2', data: '2026-07-13', itens: [
-      'Scan agora inclui a pasta raiz selecionada como topo da árvore.',
-      'Subpastas corretamente aninhadas — apenas a raiz aparece expandida.'
+    { v: '2.2.3', data: '2026-07-13', itens: [
+      'Hierarquia de pastas corrigida — subpastas aninhadas corretamente dentro dos pais.',
+      'Fallback (Brave) agora serializa em ordem hierárquica, não alfabética flat.'
     ]},
     { v: '2.2.1', data: '2026-07-13', itens: [
       'Árvore colapsável também na tela de detalhe do drive.',
@@ -111,7 +111,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.2.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.2.3', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -929,24 +929,29 @@
       const scanSt = el.querySelector('#scan-status');
       const files = scanFallback.files;
       if (!files.length) return;
-      const pastasSet = new Set();
       let nomeRaiz = '';
+      const arvore = {};
       for (const f of files) {
         const partes = f.webkitRelativePath.split('/');
         if (!nomeRaiz) nomeRaiz = partes[0];
-        for (let i = 1; i < partes.length; i++) {
-          if (i < partes.length - 1) {
-            const prof = i;
-            const nome = partes[i];
-            if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') continue;
-            pastasSet.add('›'.repeat(prof) + (prof > 0 ? ' ' : '') + nome);
-          }
+        let node = arvore;
+        for (let i = 1; i < partes.length - 1; i++) {
+          const nome = partes[i];
+          if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') break;
+          if (!node[nome]) node[nome] = {};
+          node = node[nome];
         }
       }
-      const linhas = [nomeRaiz, ...[...pastasSet].sort((a, b) => {
-        const na = a.replace(/^›+ /, ''), nb = b.replace(/^›+ /, '');
-        return na.localeCompare(nb);
-      })];
+      function serializarArvore(obj, prof) {
+        const linhas = [];
+        const nomes = Object.keys(obj).sort((a, b) => a.localeCompare(b));
+        for (const nome of nomes) {
+          linhas.push('›'.repeat(prof) + ' ' + nome);
+          if (prof < 3) linhas.push(...serializarArvore(obj[nome], prof + 1));
+        }
+        return linhas;
+      }
+      const linhas = [nomeRaiz, ...serializarArvore(arvore, 1)];
       if (!linhas.length) {
         scanSt.textContent = 'Nenhuma pasta encontrada.';
         scanSt.style.color = 'var(--warn)';
