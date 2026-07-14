@@ -16,8 +16,11 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.5.0';
+  const VERSAO = '2.5.1';
   const CHANGELOG = [
+    { v: '2.5.1', data: '2026-07-13', itens: [
+      'Timeout do S.M.A.R.T. aumentado (consulta de partições pode demorar).'
+    ]},
     { v: '2.5.0', data: '2026-07-13', itens: [
       'S.M.A.R.T.: drives agora mostram letras de unidade (C:, D:) para fácil identificação.',
       'Calendário de aquisição com tema escuro (color-scheme global).'
@@ -139,7 +142,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.5.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.5.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -783,7 +786,7 @@
   async function fetchSmart(driveData, container) {
     container.innerHTML = '<div class="smart-loading">🔄 Consultando companion…</div>';
     try {
-      const r = await fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(5000) });
+      const r = await fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(15000) });
       const data = await r.json();
       if (!data.ok) throw new Error(data.error || 'Resposta inválida');
       if (!data.drives || !data.drives.length) {
@@ -1046,7 +1049,7 @@
     function smartFormCheck() {
       const btn = el.querySelector('#smart-check-form');
       btn.disabled = true; btn.textContent = '🔄 Consultando…';
-      fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(5000) })
+      fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(15000) })
         .then(r => r.json())
         .then(data => {
           if (!data.ok || !data.drives || !data.drives.length) {

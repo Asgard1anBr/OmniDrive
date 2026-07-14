@@ -1,4 +1,4 @@
-const CACHE = 'omnidrive-v34';
+const CACHE = 'omnidrive-v35';
 const SHELL = [
   './',
   'index.html',
