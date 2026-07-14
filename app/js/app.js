@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.6.0';
+  const VERSAO = '2.6.1';
   const CHANGELOG = [
+    { v: '2.6.1', data: '2026-07-13', itens: [
+      'Corrigido: scan (Brave) falhava em silêncio quando 0 arquivos eram lidos ou dava erro — agora sempre mostra uma mensagem.',
+      'Erros durante a leitura de arquivos no fallback (Brave) agora aparecem no status e no console.'
+    ]},
     { v: '2.6.0', data: '2026-07-13', itens: [
       'Escanear pastas agora também lista arquivos soltos (não só subpastas), inclusive na raiz.',
       'Reescanear detecta arquivos novos adicionados diretamente numa pasta já catalogada.'
@@ -150,7 +154,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.6.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.6.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -1156,7 +1160,14 @@
     scanFallback.addEventListener('change', () => {
       const scanSt = el.querySelector('#scan-status');
       const files = scanFallback.files;
-      if (!files.length) return;
+      if (!files.length) {
+        scanSt.textContent = 'Nenhum arquivo lido — seleção cancelada ou pasta vazia.';
+        scanSt.style.color = 'var(--warn)';
+        return;
+      }
+      scanSt.textContent = 'Lendo ' + files.length + ' arquivo(s)…';
+      scanSt.style.color = 'var(--txt-mid)';
+      try {
       let nomeRaiz = '';
       const arvore = { __files: [] };
       for (const f of files) {
@@ -1190,9 +1201,15 @@
       if (!linhas.length) {
         scanSt.textContent = 'Nenhuma pasta encontrada.';
         scanSt.style.color = 'var(--warn)';
+        scanFallback.value = '';
         return;
       }
       aplicarScan(linhas.join('\n'), linhas.length, nomeRaiz);
+      } catch (e) {
+        console.error('OmniDrive scan error:', e);
+        scanSt.textContent = 'Erro ao ler arquivos: ' + (e.message || 'desconhecido') + ' — veja o console (F12).';
+        scanSt.style.color = 'var(--warn)';
+      }
       scanFallback.value = '';
     });
 
