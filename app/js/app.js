@@ -971,7 +971,7 @@
 
       <label class="flabel">S.M.A.R.T.</label>
       <div id="smart-form-section">
-        <button type="button" class="btn-scan" id="smart-check-form">🔧 Verificar saúde do drive</button>
+        <button type="button" class="btn-scan" id="smart-check-form">🔧 Escanear saúde e informações do dispositivo</button>
         ${d.smart && d.smart.score != null ? `<div class="smart-saved" style="margin-top:8px"><span style="color:${smartScoreColor(d.smart.score)};font-weight:700">🔧 ${d.smart.score}% — ${smartScoreLabel(d.smart.score)}</span>${d.smart.temperature != null ? ` · 🌡️ ${d.smart.temperature}°C` : ''}${d.smart.powerOnHours != null ? ` · ⏱️ ${d.smart.powerOnHours.toLocaleString()}h` : ''}${d.smart.checkedAt ? `<div class="muted" style="font-size:11px;margin-top:4px">Última verificação: ${new Date(d.smart.checkedAt).toLocaleString('pt-BR')}</div>` : ''}</div>` : ''}
       </div>
 
@@ -1016,7 +1016,7 @@
     function smartFormCheck() {
       const section = el.querySelector('#smart-form-section');
       function smartMsg(html) {
-        section.innerHTML = '<button type="button" class="btn-scan" id="smart-check-form">🔧 Verificar saúde do drive</button>' + html;
+        section.innerHTML = '<button type="button" class="btn-scan" id="smart-check-form">🔧 Escanear saúde e informações do dispositivo</button>' + html;
         el.querySelector('#smart-check-form').addEventListener('click', smartFormCheck);
       }
       const btn = el.querySelector('#smart-check-form');
@@ -1035,11 +1035,21 @@
           if (!match && modelo) match = data.drives.find(s => (s.model || '').toLowerCase().includes(modelo));
           if (!match && data.drives.length === 1) match = data.drives[0];
           if (match) {
-            d.smart = { score: match.score, health: match.health, temperature: match.temperature, powerOnHours: match.powerOnHours, reallocated: match.reallocated || 0, pending: match.pending || 0, uncorrectable: match.uncorrectable || 0, model: match.model, checkedAt: new Date().toISOString() };
+            d.smart = { score: match.score, health: match.health, temperature: match.temperature, powerOnHours: match.powerOnHours, reallocated: match.reallocated || 0, pending: match.pending || 0, uncorrectable: match.uncorrectable || 0, model: match.model, serial: match.serial, checkedAt: new Date().toISOString() };
+            if (match.serial) { const fi = el.querySelector('#f-serial'); if (fi && !fi.value) { fi.value = match.serial; d.serial = match.serial; } }
+            if (match.model) { const fm = el.querySelector('#f-modelo'); if (fm && !fm.value) { fm.value = match.model; d.modelo = match.model; } }
             const c = smartScoreColor(match.score);
             smartMsg(`<div class="smart-saved" style="margin-top:8px"><span style="color:${c};font-weight:700">🔧 ${match.score}% — ${smartScoreLabel(match.score)}</span>${match.temperature != null ? ' · 🌡️ ' + match.temperature + '°C' : ''}${match.powerOnHours != null ? ' · ⏱️ ' + match.powerOnHours.toLocaleString() + 'h' : ''}<div class="muted" style="font-size:11px;margin-top:4px">Verificado agora — ${new Date().toLocaleString('pt-BR')}</div></div>`);
           } else {
-            smartMsg(`<div class="muted" style="font-size:12px;margin-top:6px">Nenhum drive corresponde. Preencha Marca/Modelo ou Nº de série.<br><b style="font-size:11px">Detectados:</b> ${data.drives.map(s => esc(s.model || s.device)).join(', ')}</div>`);
+            smartMsg(`<div class="muted" style="font-size:12px;margin-top:6px">Selecione o drive correspondente:</div><div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${data.drives.map((s, i) => `<button type="button" class="btn-scan smart-pick" data-idx="${i}" style="font-size:12px;padding:8px">${esc(s.model || s.device)}${s.serial ? ' — ' + esc(s.serial) : ''}</button>`).join('')}</div>`);
+            el.querySelectorAll('.smart-pick').forEach(b => b.addEventListener('click', () => {
+              const picked = data.drives[+b.dataset.idx];
+              d.smart = { score: picked.score, health: picked.health, temperature: picked.temperature, powerOnHours: picked.powerOnHours, reallocated: picked.reallocated || 0, pending: picked.pending || 0, uncorrectable: picked.uncorrectable || 0, model: picked.model, serial: picked.serial, checkedAt: new Date().toISOString() };
+              if (picked.serial) { const fi = el.querySelector('#f-serial'); if (fi) { fi.value = picked.serial; d.serial = picked.serial; } }
+              if (picked.model) { const fm = el.querySelector('#f-modelo'); if (fm) { fm.value = picked.model; d.modelo = picked.model; } }
+              const c = smartScoreColor(picked.score);
+              smartMsg(`<div class="smart-saved" style="margin-top:8px"><span style="color:${c};font-weight:700">🔧 ${picked.score}% — ${smartScoreLabel(picked.score)}</span>${picked.temperature != null ? ' · 🌡️ ' + picked.temperature + '°C' : ''}${picked.powerOnHours != null ? ' · ⏱️ ' + picked.powerOnHours.toLocaleString() + 'h' : ''}<div class="muted" style="font-size:11px;margin-top:4px">Verificado agora — ${new Date().toLocaleString('pt-BR')}</div></div>`);
+            }));
           }
         })
         .catch(() => {
