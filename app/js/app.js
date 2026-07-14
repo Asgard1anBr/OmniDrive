@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.5.2';
+  const VERSAO = '2.6.0';
   const CHANGELOG = [
+    { v: '2.6.0', data: '2026-07-13', itens: [
+      'Escanear pastas agora também lista arquivos soltos (não só subpastas), inclusive na raiz.',
+      'Reescanear detecta arquivos novos adicionados diretamente numa pasta já catalogada.'
+    ]},
     { v: '2.5.2', data: '2026-07-13', itens: [
       'Companion S.M.A.R.T. agora tem versão própria (v1.2) e CHANGELOG.',
       'Adicionado LEIAME.txt no companion com instruções completas.'
@@ -146,7 +150,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.5.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.6.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -664,11 +668,13 @@
   function buildTreeHtml(nodes, hidden) {
     let h = '<ul class="tree-list"' + (hidden ? ' style="display:none"' : '') + '>';
     for (const n of nodes) {
-      const has = n.children.length > 0;
+      const isFile = n.nome.startsWith('•');
+      const nomeExibido = isFile ? n.nome.slice(1) : n.nome;
+      const has = !isFile && n.children.length > 0;
       h += '<li class="tree-item"><div class="tree-row' + (has ? ' tree-parent' : '') + '">';
       if (has) h += '<span class="tree-arrow">▸</span>';
       else h += '<span class="tree-dot">·</span>';
-      h += '<span class="tree-name">📁 ' + esc(n.nome) + '</span>';
+      h += '<span class="tree-name">' + (isFile ? '📄 ' : '📁 ') + esc(nomeExibido) + '</span>';
       if (has) h += '<span class="tree-count">' + n.children.length + '</span>';
       h += '</div>';
       if (has) h += buildTreeHtml(n.children, true);
@@ -1152,24 +1158,31 @@
       const files = scanFallback.files;
       if (!files.length) return;
       let nomeRaiz = '';
-      const arvore = {};
+      const arvore = { __files: [] };
       for (const f of files) {
         const partes = f.webkitRelativePath.split('/');
         if (!nomeRaiz) nomeRaiz = partes[0];
+        const arquivo = partes[partes.length - 1];
+        if (arquivo.startsWith('.') || arquivo.startsWith('$') || arquivo === 'Thumbs.db' || arquivo === 'desktop.ini') continue;
         let node = arvore;
+        let cortado = false;
         for (let i = 1; i < partes.length - 1; i++) {
           const nome = partes[i];
-          if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') break;
-          if (!node[nome]) node[nome] = {};
+          if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') { cortado = true; break; }
+          if (!node[nome]) node[nome] = { __files: [] };
           node = node[nome];
         }
+        if (!cortado) node.__files.push(arquivo);
       }
       function serializarArvore(obj, prof) {
         const linhas = [];
-        const nomes = Object.keys(obj).sort((a, b) => a.localeCompare(b));
+        const nomes = Object.keys(obj).filter(k => k !== '__files').sort((a, b) => a.localeCompare(b));
         for (const nome of nomes) {
           linhas.push('›'.repeat(prof) + ' ' + nome);
           if (prof < 3) linhas.push(...serializarArvore(obj[nome], prof + 1));
+        }
+        for (const arquivo of (obj.__files || []).sort((a, b) => a.localeCompare(b))) {
+          linhas.push('›'.repeat(prof) + ' •' + arquivo);
         }
         return linhas;
       }
@@ -1200,18 +1213,24 @@
 
         async function listarPastas(dirHandle, prof, max) {
           const linhas = [];
-          const entries = [];
+          const pastas = [];
+          const arquivos = [];
           for await (const [nome, entry] of dirHandle.entries()) {
-            if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') continue;
-            if (entry.kind === 'directory') entries.push({ nome, entry });
+            if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information' || nome === 'Thumbs.db' || nome === 'desktop.ini') continue;
+            if (entry.kind === 'directory') pastas.push({ nome, entry });
+            else arquivos.push(nome);
           }
-          entries.sort((a, b) => a.nome.localeCompare(b.nome));
-          for (const { nome, entry } of entries) {
+          pastas.sort((a, b) => a.nome.localeCompare(b.nome));
+          arquivos.sort((a, b) => a.localeCompare(b));
+          for (const { nome, entry } of pastas) {
             linhas.push('›'.repeat(prof) + (prof > 0 ? ' ' : '') + nome);
             if (prof < max) {
               const sub = await listarPastas(entry, prof + 1, max);
               linhas.push(...sub);
             }
+          }
+          for (const nome of arquivos) {
+            linhas.push('›'.repeat(prof) + (prof > 0 ? ' ' : '') + '•' + nome);
           }
           return linhas;
         }
