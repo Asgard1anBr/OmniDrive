@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OmniDrive S.M.A.R.T. Companion — v1.0
+OmniDrive S.M.A.R.T. Companion
 Servidor local que lê dados S.M.A.R.T. dos drives conectados via smartctl.
 O OmniDrive (browser) faz fetch em http://localhost:7777/smart para exibir saúde.
 
@@ -14,6 +14,8 @@ Requisitos:
 Uso:
   python omnidrive-smart.py
   (manter rodando enquanto usa o OmniDrive)
+
+Ver CHANGELOG.md nesta pasta para histórico de versões.
 """
 
 import http.server
@@ -24,6 +26,7 @@ import sys
 import os
 
 PORT = 7777
+COMPANION_VERSION = '1.2'
 
 def find_smartctl():
     paths = [
@@ -209,7 +212,7 @@ class SmartHandler(http.server.BaseHTTPRequestHandler):
                 'drives': results
             }, ensure_ascii=False).encode())
         elif self.path == '/ping':
-            self.wfile.write(json.dumps({'ok': True, 'version': '1.0'}).encode())
+            self.wfile.write(json.dumps({'ok': True, 'version': COMPANION_VERSION}).encode())
         else:
             self.wfile.write(json.dumps({'ok': False, 'error': 'Rota desconhecida'}).encode())
 
@@ -246,7 +249,7 @@ def main():
             print()
 
     server = http.server.HTTPServer(('127.0.0.1', PORT), SmartHandler)
-    print(f'🔧 OmniDrive S.M.A.R.T. Companion v1.0')
+    print(f'🔧 OmniDrive S.M.A.R.T. Companion v{COMPANION_VERSION}')
     print(f'   smartctl: {SMARTCTL or "NÃO ENCONTRADO"}')
     print(f'   Servidor: http://localhost:{PORT}')
     print(f'   Abra o OmniDrive no browser para ver a saúde dos drives.')

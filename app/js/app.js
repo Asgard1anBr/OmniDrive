@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.5.1';
+  const VERSAO = '2.5.2';
   const CHANGELOG = [
+    { v: '2.5.2', data: '2026-07-13', itens: [
+      'Companion S.M.A.R.T. agora tem versão própria (v1.2) e CHANGELOG.',
+      'Adicionado LEIAME.txt no companion com instruções completas.'
+    ]},
     { v: '2.5.1', data: '2026-07-13', itens: [
       'Timeout do S.M.A.R.T. aumentado (consulta de partições pode demorar).'
     ]},
@@ -142,7 +146,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.5.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.5.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [

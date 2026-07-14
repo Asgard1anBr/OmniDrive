@@ -1,0 +1,99 @@
+========================================================
+ OmniDrive S.M.A.R.T. Companion — LEIAME
+========================================================
+
+O QUE É ISSO?
+--------------------------------------------------------
+Um programinha que fica rodando no seu PC (Windows) e lê a
+saúde (S.M.A.R.T.) dos HDs/SSDs conectados. O site OmniDrive,
+aberto no navegador, conversa com ele em segundo plano para
+mostrar o "termômetro de saúde" de cada drive.
+
+Sem esse programa rodando, o botão "Escanear saúde e
+informações do dispositivo" dentro do OmniDrive não funciona
+(aparece a mensagem "Companion não detectado").
+
+
+O QUE PRECISA ESTAR INSTALADO NO PC
+--------------------------------------------------------
+1) Python 3.7 ou mais novo
+   Baixar em: https://www.python.org/downloads/
+   IMPORTANTE: na instalação, marcar a caixinha
+   "Add Python to PATH" (fica na primeira tela do instalador).
+
+2) smartmontools (o programa que lê os dados S.M.A.R.T. de
+   verdade, o Python só chama ele por baixo dos panos)
+   Baixar em: https://www.smartmontools.org/wiki/Download
+   -> escolher o instalador do Windows (.exe ou .msi)
+   -> instalar com as opções padrão
+
+
+COMO USAR (todo dia)
+--------------------------------------------------------
+1. Dar duplo clique em "iniciar-smart.bat" (está nesta pasta).
+2. Vai aparecer uma janela pedindo permissão de Administrador
+   (o Windows chama isso de UAC) — clicar em "Sim".
+   Isso é necessário porque ler S.M.A.R.T. exige acesso direto
+   ao disco, que só Administrador tem.
+3. Uma janela preta (console) vai abrir e ficar rodando.
+   NÃO FECHAR essa janela enquanto estiver usando o OmniDrive.
+4. Abrir o OmniDrive no navegador normalmente e usar o botão
+   de S.M.A.R.T. na tela de novo drive / editar drive.
+5. Quando terminar de usar, pode fechar a janela preta
+   (Ctrl+C ou clicar no X) — não faz mal nenhum.
+
+
+COMO SABER SE ESTÁ FUNCIONANDO
+--------------------------------------------------------
+Na janela preta deve aparecer algo como:
+
+  🔧 OmniDrive S.M.A.R.T. Companion v1.2
+     smartctl: smartctl
+     Servidor: http://localhost:7777
+     Abra o OmniDrive no browser para ver a saúde dos drives.
+     Ctrl+C para parar.
+
+Se aparecer "smartctl: NÃO ENCONTRADO", o smartmontools não
+foi instalado corretamente (ver seção acima).
+
+
+PROBLEMAS COMUNS
+--------------------------------------------------------
+"Companion não detectado" no OmniDrive
+  -> A janela preta não está aberta, ou foi fechada.
+     Rodar o iniciar-smart.bat de novo.
+
+"Nenhum drive S.M.A.R.T. detectado"
+  -> Rodou sem permissão de Administrador. Fechar tudo e
+     rodar o .bat de novo, clicando "Sim" na tela do UAC.
+
+Depois de eu (o Davi/desenvolvedor) atualizar o companion
+  -> Preciso reiniciar: fechar a janela preta e abrir o
+     iniciar-smart.bat de novo, para carregar a versão nova.
+     O navegador NÃO atualiza isso sozinho — é um programa
+     separado rodando no PC, diferente do site.
+
+Não sei se tenho a versão mais nova do companion
+  -> Olhar a primeira linha que aparece na janela preta
+     ("v1.2", por exemplo) e comparar com o companion/CHANGELOG.md
+     dentro da pasta do projeto no GitHub.
+
+
+ONDE FICAM OS ARQUIVOS
+--------------------------------------------------------
+companion/
+  iniciar-smart.bat   -> clicar aqui para rodar (com admin)
+  omnidrive-smart.py  -> o programa em si (não precisa mexer)
+  CHANGELOG.md         -> histórico de versões do companion
+  LEIAME.txt            -> este arquivo
+
+
+RESUMO RÁPIDO (cola isso na cabeça)
+--------------------------------------------------------
+1. Instala Python (com "Add to PATH") + smartmontools, uma
+   vez só.
+2. Sempre que for usar o S.M.A.R.T. no OmniDrive: dá dois
+   cliques no iniciar-smart.bat, aceita o UAC, deixa a janela
+   preta aberta, usa o site normalmente.
+3. Se eu atualizar o companion, você precisa fechar e abrir
+   de novo o .bat para pegar a versão nova.
