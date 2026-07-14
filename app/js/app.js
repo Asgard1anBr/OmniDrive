@@ -892,6 +892,12 @@
 
       <div class="idrow"><small>ID gerado · vira o QR</small><b>${id}</b></div>
 
+      <label class="flabel">S.M.A.R.T.</label>
+      <div id="smart-form-section">
+        <button type="button" class="btn-scan" id="smart-check-form">🔧 Escanear saúde e informações do dispositivo</button>
+        ${d.smart && d.smart.score != null ? `<div class="smart-saved" style="margin-top:8px"><span style="color:${smartScoreColor(d.smart.score)};font-weight:700">🔧 ${d.smart.score}% — ${smartScoreLabel(d.smart.score)}</span>${d.smart.temperature != null ? ` · 🌡️ ${d.smart.temperature}°C` : ''}${d.smart.powerOnHours != null ? ` · ⏱️ ${d.smart.powerOnHours.toLocaleString()}h` : ''}${d.smart.checkedAt ? `<div class="muted" style="font-size:11px;margin-top:4px">Última verificação: ${new Date(d.smart.checkedAt).toLocaleString('pt-BR')}</div>` : ''}</div>` : ''}
+      </div>
+
       <label class="flabel">Tipo</label>
       ${segHtml('f-tipo', LABELS.tipo, d.tipo)}
 
@@ -958,7 +964,7 @@
       </div>
 
       <label class="flabel">Aquisição <em>opcional</em></label>
-      <input class="field${d.aquisicao ? ' month-filled' : ''}" id="f-aquisicao" type="month" value="${esc(d.aquisicao || '')}" onchange="this.classList.toggle('month-filled',!!this.value)">
+      <input class="field" id="f-aquisicao" type="${d.aquisicao ? 'month' : 'text'}" value="${esc(d.aquisicao || '')}" placeholder=" " readonly onfocus="this.type='month';this.removeAttribute('readonly');this.showPicker?.()" onchange="this.classList.toggle('month-filled',!!this.value)">
 
       <label class="flabel">Tipos de arquivo</label>
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}
@@ -973,12 +979,6 @@
       <label class="flabel">Tags <em>separadas por vírgula</em></label>
       <input class="field" id="f-tags" value="${esc((d.tags || []).join(', '))}" placeholder="Fotos família, Cliente X" autocomplete="off">
       <div class="tag-suggestions" id="tag-sug"></div>
-
-      <label class="flabel">S.M.A.R.T.</label>
-      <div id="smart-form-section">
-        <button type="button" class="btn-scan" id="smart-check-form">🔧 Escanear saúde e informações do dispositivo</button>
-        ${d.smart && d.smart.score != null ? `<div class="smart-saved" style="margin-top:8px"><span style="color:${smartScoreColor(d.smart.score)};font-weight:700">🔧 ${d.smart.score}% — ${smartScoreLabel(d.smart.score)}</span>${d.smart.temperature != null ? ` · 🌡️ ${d.smart.temperature}°C` : ''}${d.smart.powerOnHours != null ? ` · ⏱️ ${d.smart.powerOnHours.toLocaleString()}h` : ''}${d.smart.checkedAt ? `<div class="muted" style="font-size:11px;margin-top:4px">Última verificação: ${new Date(d.smart.checkedAt).toLocaleString('pt-BR')}</div>` : ''}</div>` : ''}
-      </div>
 
       <label class="flabel">Observações <em>opcional</em></label>
       <textarea class="field" id="f-obs" placeholder="Notas…">${esc(d.observacoes || '')}</textarea>
