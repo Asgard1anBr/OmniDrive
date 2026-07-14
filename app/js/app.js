@@ -562,7 +562,7 @@
   }
 
   function smartBadge(d) {
-    if (!d.smart || d.smart.score == null) return '<span class="smart-badge smart-none" title="S.M.A.R.T. não escaneado">🔧 —</span>';
+    if (!d.smart || d.smart.score == null) return '<span class="smart-badge smart-none" title="S.M.A.R.T. não escaneado">sem dados de saúde</span>';
     const s = d.smart.score, c = smartScoreColor(s);
     const dt = d.smart.checkedAt ? ' (' + new Date(d.smart.checkedAt).toLocaleDateString('pt-BR') + ')' : '';
     return `<span class="smart-badge" style="color:${c}" title="S.M.A.R.T. ${s}% — ${smartScoreLabel(s)}${dt}">🔧${s}%</span>`;
