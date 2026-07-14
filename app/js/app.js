@@ -16,8 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.3.3';
+  const VERSAO = '2.4.0';
   const CHANGELOG = [
+    { v: '2.4.0', data: '2026-07-13', itens: [
+      'S.M.A.R.T.: seleção manual de drive quando não há correspondência automática.',
+      'Auto-preenchimento de Nº de série e Marca/Modelo a partir do S.M.A.R.T.',
+      'Botão renomeado para "Escanear saúde e informações do dispositivo".'
+    ]},
     { v: '2.3.3', data: '2026-07-13', itens: [
       'Corrigido empilhamento de mensagens ao clicar S.M.A.R.T. várias vezes.',
       'Corrigido placeholder do campo de mês (não exibe mais texto selecionável).'
@@ -122,7 +127,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.3.3', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.4.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
