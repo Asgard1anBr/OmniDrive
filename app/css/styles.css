@@ -69,7 +69,8 @@ input::placeholder, textarea::placeholder{color:#8aa0b0;}
 input[type="date"],input[type="month"],input[type="number"],select{color-scheme:dark;}
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="month"]::-webkit-calendar-picker-indicator{filter:brightness(0) invert(1);cursor:pointer;width:20px;height:20px;opacity:.7;}
-input[type="month"]{min-height:48px;}
+input[type="month"]{min-height:48px;color:transparent;}
+input[type="month"].month-filled{color:inherit;}
 input[type="month"]::-webkit-datetime-edit{color:transparent;}
 input[type="month"].month-filled::-webkit-datetime-edit{color:inherit;}
 .filter-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
