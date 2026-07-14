@@ -16,11 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.2.3';
+  const VERSAO = '2.3';
   const CHANGELOG = [
-    { v: '2.2.3', data: '2026-07-13', itens: [
-      'Hierarquia de pastas corrigida — subpastas aninhadas corretamente dentro dos pais.',
-      'Fallback (Brave) agora serializa em ordem hierárquica, não alfabética flat.'
+    { v: '2.3', data: '2026-07-13', itens: [
+      'S.M.A.R.T. — verificação de saúde do drive via companion local.',
+      'Score de saúde com gauge visual, temperatura, horas ligado, setores ruins.',
+      'Correspondência automática por nº de série ou modelo.',
+      'Companion Python incluso (companion/omnidrive-smart.py).'
     ]},
     { v: '2.2.1', data: '2026-07-13', itens: [
       'Árvore colapsável também na tela de detalhe do drive.',
@@ -111,7 +113,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.2.3', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.3', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -648,6 +650,108 @@
     bindTreeClicks(container);
   }
 
+  // ================= S.M.A.R.T. =================
+  const SMART_URL = 'http://localhost:7777';
+
+  function smartScoreColor(score) {
+    if (score >= 80) return '#2ee6e0';
+    if (score >= 50) return '#f5b544';
+    return '#e5484d';
+  }
+
+  function smartScoreLabel(score) {
+    if (score >= 90) return 'Excelente';
+    if (score >= 70) return 'Bom';
+    if (score >= 50) return 'Atenção';
+    if (score >= 30) return 'Crítico';
+    return 'Falha iminente';
+  }
+
+  function renderSmartResult(container, driveData, smartDrives) {
+    const serial = (driveData.serial || '').toLowerCase().trim();
+    const modelo = (driveData.modelo || '').toLowerCase().trim();
+    let match = null;
+    if (serial) match = smartDrives.find(s => (s.serial || '').toLowerCase().trim() === serial);
+    if (!match && modelo) match = smartDrives.find(s => (s.model || '').toLowerCase().includes(modelo));
+    if (!match && smartDrives.length === 1) match = smartDrives[0];
+
+    if (!match) {
+      container.innerHTML = `
+        <div class="smart-info muted" style="font-size:13px">
+          Nenhum drive conectado corresponde a este cadastro.<br>
+          <span style="font-size:11px">Dica: preencha Marca/Modelo ou Nº de série para correspondência automática.</span>
+        </div>
+        <div class="smart-all"><b style="font-size:12px;color:var(--txt-mid)">Drives detectados:</b>
+          ${smartDrives.map(s => `<div class="smart-detected">• ${esc(s.model || s.device)} ${s.serial ? '(S/N: ' + esc(s.serial) + ')' : ''} — Score: ${s.score ?? '?'}</div>`).join('')}
+        </div>`;
+      return;
+    }
+
+    const score = match.score ?? 0;
+    const color = smartScoreColor(score);
+    const label = smartScoreLabel(score);
+    const R = 50, C = 2 * Math.PI * R;
+    container.innerHTML = `
+      <div class="smart-card">
+        <div class="smart-gauge">
+          <svg viewBox="0 0 120 120" width="120" height="120">
+            <circle cx="60" cy="60" r="${R}" fill="none" stroke="#16303f" stroke-width="10"/>
+            <circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="10"
+              stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - score / 100)).toFixed(1)}"
+              transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${color})"/>
+          </svg>
+          <div class="smart-score" style="color:${color}">${score}<span>%</span></div>
+        </div>
+        <div class="smart-details">
+          <div class="smart-label" style="color:${color}">${label}</div>
+          <div class="smart-model">${esc(match.model || match.device)}</div>
+          ${match.serial ? `<div class="smart-serial">S/N: ${esc(match.serial)}</div>` : ''}
+          <div class="smart-attrs">
+            ${match.temperature != null ? `<span>🌡️ ${match.temperature}°C</span>` : ''}
+            ${match.powerOnHours != null ? `<span>⏱️ ${match.powerOnHours.toLocaleString()}h</span>` : ''}
+            ${match.health ? `<span>${match.health === 'PASSED' ? '✅' : '❌'} ${match.health}</span>` : ''}
+          </div>
+          <div class="smart-attrs">
+            ${match.reallocated ? `<span style="color:var(--warn)">⚠️ ${match.reallocated} setores realocados</span>` : ''}
+            ${match.pending ? `<span style="color:var(--warn)">⚠️ ${match.pending} setores pendentes</span>` : ''}
+            ${match.uncorrectable ? `<span style="color:var(--danger)">❌ ${match.uncorrectable} incorrigíveis</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  async function fetchSmart(driveData, container) {
+    container.innerHTML = '<div class="smart-loading">🔄 Consultando companion…</div>';
+    try {
+      const r = await fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(5000) });
+      const data = await r.json();
+      if (!data.ok) throw new Error(data.error || 'Resposta inválida');
+      if (!data.drives || !data.drives.length) {
+        container.innerHTML = '<div class="smart-info muted">Companion conectado, mas nenhum drive S.M.A.R.T. detectado.</div>';
+        return;
+      }
+      renderSmartResult(container, driveData, data.drives);
+    } catch (e) {
+      if (e.name === 'TimeoutError' || e.message.includes('fetch')) {
+        container.innerHTML = `
+          <div class="smart-offline">
+            <div style="font-size:14px;margin-bottom:8px">⚠️ Companion não detectado</div>
+            <div class="muted" style="font-size:12px;margin-bottom:12px">
+              Para ver a saúde S.M.A.R.T., rode o companion no computador onde o drive está plugado.
+            </div>
+            <div class="smart-steps">
+              <div>1. Instale o <a href="https://www.smartmontools.org/wiki/Download" target="_blank" style="color:var(--cyan)">smartmontools</a></div>
+              <div>2. Baixe o <a href="https://github.com/Asgard1anBr/OmniDrive/tree/main/companion" target="_blank" style="color:var(--cyan)">companion</a></div>
+              <div>3. Execute: <code style="color:var(--cyan-lt)">python omnidrive-smart.py</code></div>
+              <div>4. Clique em "Verificar saúde" novamente</div>
+            </div>
+          </div>`;
+      } else {
+        container.innerHTML = `<div class="smart-info" style="color:var(--warn)">Erro: ${esc(e.message)}</div>`;
+      }
+    }
+  }
+
   // ================= DETALHE =================
   function renderDetalhe(cat) {
     const d = cat.drives.find(x => x.id === state.driveId);
@@ -708,10 +812,15 @@
       <div class="hint">Conteúdo</div>
       ${temArvore ? '<div id="detail-tree"></div>' : `<div class="content-list">${linhas}</div>`}
       ${d.observacoes ? `<div class="hint">Observações</div><div class="muted" style="font-size:13px">${esc(d.observacoes)}</div>` : ''}
+      <div class="hint">S.M.A.R.T.</div>
+      <div id="smart-section" class="smart-section">
+        <button type="button" class="btn-scan" id="smart-check">🔧 Verificar saúde do drive</button>
+      </div>
       <button class="btn-remove-small" id="remover">Remover drive</button>`;
 
     if (temArvore) renderTreeReadonly(el.querySelector('#detail-tree'), d.conteudo);
 
+    document.getElementById('smart-check').addEventListener('click', () => fetchSmart(d, el.querySelector('#smart-section')));
     document.getElementById('back').addEventListener('click', () => go('busca'));
     document.getElementById('editar').addEventListener('click', () => { state.editId = d.id; go('cadastro'); });
     document.getElementById('qr').addEventListener('click', () => abrirQR(d));
