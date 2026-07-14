@@ -16,8 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.3';
+  const VERSAO = '2.3.1';
   const CHANGELOG = [
+    { v: '2.3.1', data: '2026-07-13', itens: [
+      'S.M.A.R.T. salvo no drive — badge de saúde nos cards e dashboard.',
+      'Verificação salva score, temperatura, horas e setores no catálogo.',
+      'Badge 🔧 com percentual colorido aparece em lista, galeria e top drives.'
+    ]},
     { v: '2.3', data: '2026-07-13', itens: [
       'S.M.A.R.T. — verificação de saúde do drive via companion local.',
       'Score de saúde com gauge visual, temperatura, horas ligado, setores ruins.',
@@ -113,7 +118,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.3', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.3.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -453,6 +458,7 @@
       return `<div class="dash-top-item" data-id="${d.id}">
         <span style="font-size:18px">${DRIVE_ICON[d.tipo] || '💾'}</span>
         <span class="dash-top-name">${esc(d.nome)}</span>
+        ${smartBadge(d)}
         <span class="dash-top-bar"><i style="width:${pct}%;background:${pctColor(pct)}"></i></span>
         <span class="dash-top-pct" style="color:${pctColor(pct)}">${pct}%</span>
       </div>`;
@@ -538,6 +544,12 @@
     return html;
   }
 
+  function smartBadge(d) {
+    if (!d.smart || d.smart.score == null) return '';
+    const s = d.smart.score, c = smartScoreColor(s);
+    return `<span class="smart-badge" style="color:${c}" title="S.M.A.R.T. ${s}% — ${smartScoreLabel(s)}">🔧${s}%</span>`;
+  }
+
   function cardHtml(d, gallery) {
     const pct = usoPct(d);
     if (gallery) {
@@ -549,6 +561,7 @@
         <div class="id-chip" style="margin:4px auto 0">${d.id}</div>
         ${bar}
         ${d.local ? `<div class="card-location" style="font-size:10px;color:var(--txt-soft);margin-top:4px">📍 ${esc(d.local)}</div>` : ''}
+        ${smartBadge(d)}
       </div>`;
     }
     const bar = pct == null ? '' :
@@ -556,7 +569,7 @@
     return `<div class="card" data-id="${d.id}">
       <div class="card-head"><div class="dname">${DRIVE_ICON[d.tipo] || '💾'} ${esc(d.nome)}</div><div class="id-chip">${d.id}</div></div>
       <div class="match">${snippet(d)}</div>
-      <div class="meta"><span>${LABELS.tipo[d.tipo] || d.tipo}${d.local ? ' · 📍 ' + esc(d.local) : ''}</span>${bar}</div>
+      <div class="meta"><span>${LABELS.tipo[d.tipo] || d.tipo}${d.local ? ' · 📍 ' + esc(d.local) : ''}</span>${smartBadge(d)}${bar}</div>
     </div>`;
   }
 
@@ -720,6 +733,31 @@
       </div>`;
   }
 
+  function saveSmart(driveData, smartDrives) {
+    const serial = (driveData.serial || '').toLowerCase().trim();
+    const modelo = (driveData.modelo || '').toLowerCase().trim();
+    let match = null;
+    if (serial) match = smartDrives.find(s => (s.serial || '').toLowerCase().trim() === serial);
+    if (!match && modelo) match = smartDrives.find(s => (s.model || '').toLowerCase().includes(modelo));
+    if (!match && smartDrives.length === 1) match = smartDrives[0];
+    if (!match) return;
+    const cat = store.load();
+    const d = cat.drives.find(x => x.id === driveData.id);
+    if (!d) return;
+    d.smart = {
+      score: match.score ?? null,
+      health: match.health || null,
+      temperature: match.temperature ?? null,
+      powerOnHours: match.powerOnHours ?? null,
+      reallocated: match.reallocated ?? 0,
+      pending: match.pending ?? 0,
+      uncorrectable: match.uncorrectable ?? 0,
+      model: match.model || null,
+      checkedAt: new Date().toISOString()
+    };
+    store.save(cat);
+  }
+
   async function fetchSmart(driveData, container) {
     container.innerHTML = '<div class="smart-loading">🔄 Consultando companion…</div>';
     try {
@@ -731,6 +769,7 @@
         return;
       }
       renderSmartResult(container, driveData, data.drives);
+      saveSmart(driveData, data.drives);
     } catch (e) {
       if (e.name === 'TimeoutError' || e.message.includes('fetch')) {
         container.innerHTML = `
