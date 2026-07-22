@@ -14,10 +14,26 @@ informações do dispositivo" dentro do OmniDrive não funciona
 (aparece a mensagem "Companion não detectado").
 
 
+LINKS DE DOWNLOAD (copie e cole no navegador)
+--------------------------------------------------------
+PYTHON (Windows 64-bit) — instalador direto:
+  https://www.python.org/downloads/windows/
+  Pagina oficial de downloads (escolhe a versao automatica):
+  https://www.python.org/downloads/
+
+SMARTMONTOOLS (Windows) — pagina de download:
+  https://www.smartmontools.org/wiki/Download
+  Instalador direto (builds oficiais no SourceForge):
+  https://sourceforge.net/projects/smartmontools/files/smartmontools/
+
+(Os dois sao gratuitos e de codigo aberto.)
+
+
 O QUE PRECISA ESTAR INSTALADO NO PC
 --------------------------------------------------------
 1) Python 3.7 ou mais novo
    Baixar em: https://www.python.org/downloads/
+   Instalador Windows direto: https://www.python.org/downloads/windows/
    IMPORTANTE: na instalação, marcar a caixinha
    "Add python.exe to PATH" (fica na primeira tela do instalador).
 
