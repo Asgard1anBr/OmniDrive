@@ -25,8 +25,15 @@ import re
 import sys
 import os
 
+# Evita crash de UnicodeEncodeError ao imprimir emoji em consoles Windows (cp1252)
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
+
 PORT = 7777
-COMPANION_VERSION = '1.3'
+COMPANION_VERSION = '1.4'
 
 def find_smartctl():
     paths = [
