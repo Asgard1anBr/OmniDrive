@@ -19,7 +19,15 @@ O QUE PRECISA ESTAR INSTALADO NO PC
 1) Python 3.7 ou mais novo
    Baixar em: https://www.python.org/downloads/
    IMPORTANTE: na instalação, marcar a caixinha
-   "Add Python to PATH" (fica na primeira tela do instalador).
+   "Add python.exe to PATH" (fica na primeira tela do instalador).
+
+   ATENÇÃO ao "Python falso da Microsoft Store":
+   O Windows vem com um ATALHO FALSO de python. Se ao rodar o
+   companion abrir a loja (Microsoft Store) ou aparecer
+   "Python was not found", é esse atalho fajuto — NÃO é o Python
+   de verdade. A solução é instalar o Python pelo link acima
+   (python.org) marcando "Add to PATH". O iniciar-smart.bat já
+   detecta e avisa quando só o atalho falso está presente.
 
 2) smartmontools (o programa que lê os dados S.M.A.R.T. de
    verdade, o Python só chama ele por baixo dos panos)

@@ -26,7 +26,7 @@ import sys
 import os
 
 PORT = 7777
-COMPANION_VERSION = '1.2'
+COMPANION_VERSION = '1.3'
 
 def find_smartctl():
     paths = [
