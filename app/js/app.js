@@ -16,8 +16,14 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.6.1';
+  const VERSAO = '2.7.0';
   const CHANGELOG = [
+    { v: '2.7.0', data: '2026-07-13', itens: [
+      'Novo: Relatório em PDF — botão no Painel gera um relatório imprimível dos drives.',
+      'Escolha os drives (todos ou selecionados) e as seções (dados, saúde S.M.A.R.T., pastas, local/tags/observações, etc.).',
+      'Dois formatos combináveis: tabela resumo + fichas detalhadas com árvore de conteúdo.',
+      'Gera via impressão nativa do navegador — use "Salvar como PDF".'
+    ]},
     { v: '2.6.1', data: '2026-07-13', itens: [
       'Corrigido: scan (Brave) falhava em silêncio quando 0 arquivos eram lidos ou dava erro — agora sempre mostra uma mensagem.',
       'Erros durante a leitura de arquivos no fallback (Brave) agora aparecem no status e no console.'
@@ -154,7 +160,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.6.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.7.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -548,11 +554,13 @@
       <div class="dash-section">
         <div class="hint">Mais cheios</div>
         <div class="dash-top">${topHtml}</div>
-      </div>`;
+      </div>
+      <button class="btn ghost" id="dash-relatorio" style="width:100%;margin-top:6px">📄 Gerar relatório (PDF)</button>`;
 
     el.querySelectorAll('.dash-top-item').forEach(item => item.addEventListener('click', () => {
       state.driveId = item.dataset.id; go('detalhe');
     }));
+    el.querySelector('#dash-relatorio').addEventListener('click', () => go('relatorio'));
   }
 
   // ================= BUSCA =================
@@ -1358,6 +1366,199 @@
     document.getElementById('e-local').addEventListener('click', () => { mode = 'local'; state.authed = true; go('dashboard'); });
   }
 
+  // ================= RELATÓRIO =================
+  const REPORT_SECS = [
+    { id: 'basicos', label: 'Dados básicos e capacidade', on: true },
+    { id: 'smart', label: 'Saúde S.M.A.R.T.', on: true },
+    { id: 'conteudo', label: 'Pastas e arquivos', on: true },
+    { id: 'localtags', label: 'Local, tags e observações', on: true },
+    { id: 'ident', label: 'Marca, modelo e nº série', on: false },
+    { id: 'datas', label: 'Datas (aquisição, cadastro)', on: false }
+  ];
+
+  function buildTreeStatic(nodes) {
+    let h = '<ul class="rep-tree">';
+    for (const n of nodes) {
+      const isFile = n.nome.startsWith('•');
+      const nome = isFile ? n.nome.slice(1) : n.nome;
+      h += '<li class="' + (isFile ? 'rep-file' : 'rep-folder') + '">' + (isFile ? '📄 ' : '📁 ') + esc(nome);
+      if (!isFile && n.children.length) h += buildTreeStatic(n.children);
+      h += '</li>';
+    }
+    return h + '</ul>';
+  }
+
+  function repTabela(list, secs) {
+    const cols = ['Drive', 'ID', 'Tipo'];
+    if (secs.has('basicos')) cols.push('Capacidade', 'Uso');
+    if (secs.has('smart')) cols.push('Saúde');
+    if (secs.has('localtags')) cols.push('Local');
+    const head = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+    const body = list.map(d => {
+      const cells = [`<b>${esc(d.nome)}</b>`, d.id, LABELS.tipo[d.tipo] || d.tipo || '—'];
+      if (secs.has('basicos')) {
+        cells.push(d.capacidadeGB != null ? fmtGB(d.capacidadeGB) : '—');
+        const p = usoPct(d); cells.push(p != null ? p + '%' : '—');
+      }
+      if (secs.has('smart')) cells.push(d.smart && d.smart.score != null ? d.smart.score + '%' : '—');
+      if (secs.has('localtags')) cells.push(d.local ? esc(d.local) : '—');
+      return '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
+    }).join('');
+    return `<table class="rep-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  }
+
+  function repFicha(d, secs) {
+    let rows = '';
+    const add = (k, v) => { if (v != null && v !== '') rows += `<tr><th>${k}</th><td>${v}</td></tr>`; };
+    if (secs.has('basicos')) {
+      add('Tipo', LABELS.tipo[d.tipo] || d.tipo || '—');
+      add('Tamanho físico', d.tamanho ? (LABELS.tamanho[d.tamanho] || d.tamanho) : null);
+      add('Capacidade', d.capacidadeGB != null ? fmtGB(d.capacidadeGB) : null);
+      const pct = usoPct(d);
+      add('Espaço usado', d.usadoGB != null ? `${fmtGB(d.usadoGB)}${pct != null ? ` (${pct}%)` : ''}` : null);
+      add('Estado', d.estado ? (LABELS.estado[d.estado] || d.estado) : null);
+      add('Conexão', d.conexao ? esc(d.conexao) : null);
+      add('Partições', d.particoes);
+      add('Criptografia', d.criptografia ? (LABELS.criptografia[d.criptografia] || d.criptografia) : null);
+      add('Acondicionamento', d.acondicionamento ? (LABELS.acondicionamento[d.acondicionamento] || d.acondicionamento) : null);
+      const ta = (d.tiposArquivo || []).map(t => LABELS.tiposArquivo[t] || t);
+      if (ta.length) add('Tipos de arquivo', ta.join(', '));
+    }
+    if (secs.has('ident')) {
+      add('Marca', d.marca ? esc(d.marca) : null);
+      add('Modelo', d.modelo ? esc(d.modelo) : null);
+      add('Nº de série', d.serial ? esc(d.serial) : null);
+    }
+    if (secs.has('smart')) {
+      if (d.smart && d.smart.score != null) {
+        add('Saúde S.M.A.R.T.', `${d.smart.score}% — ${smartScoreLabel(d.smart.score)}`);
+        add('Temperatura', d.smart.temperature != null ? d.smart.temperature + ' °C' : null);
+        add('Horas ligado', d.smart.powerOnHours != null ? d.smart.powerOnHours.toLocaleString('pt-BR') + ' h' : null);
+        add('Verificado em', d.smart.checkedAt ? new Date(d.smart.checkedAt).toLocaleString('pt-BR') : null);
+      } else {
+        add('Saúde S.M.A.R.T.', '<i>não escaneado</i>');
+      }
+    }
+    if (secs.has('localtags')) {
+      add('Local', d.local ? esc(d.local) : null);
+      if ((d.tags || []).length) add('Tags', d.tags.map(esc).join(', '));
+      if (d.observacoes) add('Observações', esc(d.observacoes));
+    }
+    if (secs.has('datas')) {
+      add('Aquisição', d.aquisicao ? d.aquisicao.split('-').reverse().join('/') : null);
+      add('Cadastrado', d.criadoEm ? new Date(d.criadoEm).toLocaleDateString('pt-BR') : null);
+      add('Atualizado', d.atualizadoEm ? new Date(d.atualizadoEm).toLocaleDateString('pt-BR') : null);
+    }
+    let tree = '';
+    if (secs.has('conteudo') && d.conteudo) {
+      if (d.conteudo.includes('›')) tree = buildTreeStatic(parseTree(d.conteudo));
+      else { const its = splitConteudo(d.conteudo); if (its.length) tree = '<ul class="rep-tree">' + its.map(i => '<li class="rep-file">' + esc(i) + '</li>').join('') + '</ul>'; }
+    }
+    return `<div class="rep-ficha">
+      <div class="rep-ficha-head"><span class="rep-ficha-icon">${DRIVE_ICON[d.tipo] || '💾'}</span>
+        <span class="rep-ficha-name">${esc(d.nome)}</span><span class="rep-ficha-id">${d.id}</span></div>
+      ${rows ? `<table class="rep-kv">${rows}</table>` : ''}
+      ${tree ? `<div class="rep-tree-wrap"><div class="rep-tree-title">📂 Conteúdo escaneado</div>${tree}</div>` : ''}
+    </div>`;
+  }
+
+  function gerarRelatorio(cat, cfg) {
+    const list = cfg.ids ? cat.drives.filter(d => cfg.ids.includes(d.id)) : cat.drives;
+    if (!list.length) { toast('Nenhum drive para o relatório.'); return; }
+    const now = new Date().toLocaleString('pt-BR');
+    let inner = `<div class="rep-doc">
+      <div class="rep-doc-head">
+        <div class="rep-brand">OMNI<b>DRIVE</b></div>
+        <div class="rep-title">Relatório de Drives</div>
+        <div class="rep-sub">${list.length} drive(s) · Gerado em ${now}</div>
+      </div>`;
+    if (cfg.fmt === 'ambos' || cfg.fmt === 'tabela') inner += `<h2 class="rep-h2">Resumo</h2>${repTabela(list, cfg.secs)}`;
+    if (cfg.fmt === 'ambos' || cfg.fmt === 'fichas') inner += `<h2 class="rep-h2">Fichas detalhadas</h2>${list.map(d => repFicha(d, cfg.secs)).join('')}`;
+    inner += `<div class="rep-foot">Gerado pelo OmniDrive ${VERSAO}</div></div>`;
+
+    const ov = document.createElement('div'); ov.id = 'rep-overlay';
+    ov.innerHTML = `<div class="rep-toolbar">
+        <button class="btn ghost" id="rep-fechar">‹ Fechar</button>
+        <span class="rep-toolbar-title">Prévia — use Imprimir → Salvar como PDF</span>
+        <button class="btn" id="rep-print">🖨️ Imprimir / PDF</button>
+      </div><div class="rep-scroll">${inner}</div>`;
+    document.body.appendChild(ov);
+    document.getElementById('rep-fechar').addEventListener('click', () => ov.remove());
+    document.getElementById('rep-print').addEventListener('click', () => window.print());
+  }
+
+  function renderRelatorio(cat) {
+    const drives = cat.drives;
+    const driveCbs = drives.map(d =>
+      `<label class="rep-cb"><input type="checkbox" class="rep-drive-cb" value="${d.id}" checked> ${DRIVE_ICON[d.tipo] || '💾'} ${esc(d.nome)} <span class="rep-cb-id">${d.id}</span></label>`
+    ).join('');
+    const secPills = REPORT_SECS.map(s =>
+      `<button type="button" class="fpill ${s.on ? 'on' : ''}" data-sec="${s.id}">${s.label}</button>`
+    ).join('');
+
+    el.innerHTML = `
+      <button class="back" id="back">‹ Voltar</button>
+      <div class="screen-label">Relatório</div>
+
+      <div class="rep-group">
+        <div class="hint">Drives incluídos</div>
+        <div class="rep-scope">
+          <button type="button" class="fpill on" data-scope="todos">Todos (${drives.length})</button>
+          <button type="button" class="fpill" data-scope="escolher">Escolher…</button>
+        </div>
+        <div id="rep-drive-list" style="display:none">
+          <div class="rep-cb-actions"><button type="button" id="rep-all">Marcar todos</button><button type="button" id="rep-none">Desmarcar todos</button></div>
+          ${driveCbs}
+        </div>
+      </div>
+
+      <div class="rep-group">
+        <div class="hint">Formato</div>
+        <div class="rep-fmt">
+          <button type="button" class="fpill on" data-fmt="ambos">Tabela + Fichas</button>
+          <button type="button" class="fpill" data-fmt="tabela">Só tabela</button>
+          <button type="button" class="fpill" data-fmt="fichas">Só fichas</button>
+        </div>
+      </div>
+
+      <div class="rep-group">
+        <div class="hint">Informações incluídas</div>
+        <div class="rep-secs">${secPills}</div>
+      </div>
+
+      <button class="btn" id="rep-gerar" style="width:100%;margin-top:6px">📄 Gerar relatório</button>
+      <div class="muted" style="font-size:12px;margin-top:8px;text-align:center">Abre uma prévia. No diálogo de impressão, escolha <b>"Salvar como PDF"</b> como destino.</div>`;
+
+    el.querySelector('#back').addEventListener('click', () => go('dashboard'));
+
+    const listBox = el.querySelector('#rep-drive-list');
+    el.querySelectorAll('.rep-scope button').forEach(b => b.addEventListener('click', () => {
+      el.querySelectorAll('.rep-scope button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      listBox.style.display = b.dataset.scope === 'escolher' ? '' : 'none';
+    }));
+    el.querySelector('#rep-all').addEventListener('click', () => el.querySelectorAll('.rep-drive-cb').forEach(c => c.checked = true));
+    el.querySelector('#rep-none').addEventListener('click', () => el.querySelectorAll('.rep-drive-cb').forEach(c => c.checked = false));
+    el.querySelectorAll('.rep-fmt button').forEach(b => b.addEventListener('click', () => {
+      el.querySelectorAll('.rep-fmt button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+    }));
+    el.querySelectorAll('.rep-secs button').forEach(b => b.addEventListener('click', () => b.classList.toggle('on')));
+
+    el.querySelector('#rep-gerar').addEventListener('click', () => {
+      const scope = el.querySelector('.rep-scope button.on').dataset.scope;
+      let ids = null;
+      if (scope === 'escolher') {
+        ids = [...el.querySelectorAll('.rep-drive-cb:checked')].map(c => c.value);
+        if (!ids.length) { toast('Marque ao menos um drive.'); return; }
+      }
+      const fmt = el.querySelector('.rep-fmt button.on').dataset.fmt;
+      const secs = new Set([...el.querySelectorAll('.rep-secs button.on')].map(b => b.dataset.sec));
+      if (!secs.size) { toast('Escolha ao menos uma seção de informação.'); return; }
+      gerarRelatorio(cat, { ids, fmt, secs });
+    });
+  }
+
   // ================= SOBRE =================
   function renderSobre() {
     const acctLine = state.authed
@@ -1400,12 +1601,13 @@
   function go(view) { state.view = view; render(); }
   function render() {
     document.querySelectorAll('.navbtn').forEach(t =>
-      t.classList.toggle('active', t.dataset.view === state.view || (state.view === 'detalhe' && t.dataset.view === 'busca') || (state.view === 'versoes' && t.dataset.view === 'dashboard')));
+      t.classList.toggle('active', t.dataset.view === state.view || (state.view === 'detalhe' && t.dataset.view === 'busca') || ((state.view === 'versoes' || state.view === 'relatorio') && t.dataset.view === 'dashboard')));
     if (state.view === 'sobre') return renderSobre();
     if (state.view === 'versoes') return renderVersoes();
     if (!state.authed || state.view === 'entrar') return renderEntrar();
     const cat = store.load();
     if (state.view === 'dashboard') renderDashboard(cat);
+    else if (state.view === 'relatorio') renderRelatorio(cat);
     else if (state.view === 'busca') renderBusca(cat);
     else if (state.view === 'detalhe') renderDetalhe(cat);
     else if (state.view === 'cadastro') renderCadastro(cat, state.editId ? cat.drives.find(d => d.id === state.editId) : null);

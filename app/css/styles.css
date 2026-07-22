@@ -340,3 +340,62 @@ select.field option{background:#0b1a26;color:#fff;}
 .tag-sug{font-size:11px;padding:4px 10px;border-radius:14px;border:1px dashed var(--line-cyan);
   color:var(--cyan-lt);cursor:pointer;background:rgba(46,230,224,.04);transition:background .12s;}
 .tag-sug:hover{background:rgba(46,230,224,.14);}
+
+/* ================= RELATÓRIO — configuração ================= */
+.rep-group{margin:14px 0;}
+.rep-scope,.rep-fmt,.rep-secs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.rep-cb-actions{display:flex;gap:10px;margin:10px 0 6px;}
+.rep-cb-actions button{font-size:12px;color:var(--cyan-lt);background:none;border:none;cursor:pointer;text-decoration:underline;}
+#rep-drive-list{margin-top:8px;max-height:280px;overflow-y:auto;background:rgba(0,0,0,.15);border-radius:10px;padding:8px 10px;}
+.rep-cb{display:flex;align-items:center;gap:8px;padding:6px 2px;font-size:14px;color:var(--txt-mid);cursor:pointer;border-bottom:1px solid var(--line);}
+.rep-cb:last-child{border-bottom:none;}
+.rep-cb input{width:16px;height:16px;accent-color:var(--cyan);flex:none;}
+.rep-cb-id{margin-left:auto;font-size:11px;color:var(--txt-soft);font-family:monospace;}
+
+/* ================= RELATÓRIO — prévia + documento ================= */
+#rep-overlay{position:fixed;inset:0;z-index:2000;background:#0a1420;display:flex;flex-direction:column;}
+.rep-toolbar{flex:none;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0d1a28;
+  border-bottom:1px solid var(--line);}
+.rep-toolbar .btn{width:auto;padding:8px 14px;margin:0;}
+.rep-toolbar-title{flex:1;text-align:center;font-size:12px;color:var(--txt-soft);}
+.rep-scroll{flex:1;overflow-y:auto;padding:20px 12px 60px;display:flex;justify-content:center;}
+
+/* documento em tema CLARO (para impressão/PDF legível) */
+.rep-doc{background:#fff;color:#1a1a1a;width:100%;max-width:780px;padding:32px 36px;border-radius:6px;
+  box-shadow:0 4px 24px rgba(0,0,0,.4);font-size:13px;line-height:1.5;}
+.rep-doc-head{border-bottom:3px solid #12222f;padding-bottom:14px;margin-bottom:22px;}
+.rep-brand{font-size:22px;font-weight:400;letter-spacing:3px;color:#12384a;}
+.rep-brand b{font-weight:800;color:#0d9488;}
+.rep-title{font-size:20px;font-weight:700;margin-top:6px;color:#111;}
+.rep-sub{font-size:12px;color:#666;margin-top:4px;}
+.rep-h2{font-size:15px;font-weight:700;color:#0d5a66;margin:26px 0 10px;padding-bottom:5px;border-bottom:1px solid #d5dde0;}
+.rep-table{width:100%;border-collapse:collapse;font-size:12px;}
+.rep-table th,.rep-table td{border:1px solid #d5dde0;padding:6px 8px;text-align:left;}
+.rep-table thead th{background:#12222f;color:#eafeff;font-weight:600;}
+.rep-table tbody tr:nth-child(even){background:#f4f7f8;}
+.rep-ficha{border:1px solid #d5dde0;border-radius:6px;padding:14px 16px;margin-bottom:16px;page-break-inside:avoid;}
+.rep-ficha-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e3e9eb;}
+.rep-ficha-icon{font-size:18px;}
+.rep-ficha-name{font-size:15px;font-weight:700;color:#111;}
+.rep-ficha-id{margin-left:auto;font-family:monospace;font-size:11px;color:#0d9488;background:#e6f6f4;padding:2px 8px;border-radius:6px;}
+.rep-kv{width:100%;border-collapse:collapse;font-size:12px;}
+.rep-kv th{text-align:left;font-weight:600;color:#555;width:170px;vertical-align:top;padding:3px 8px 3px 0;white-space:nowrap;}
+.rep-kv td{padding:3px 0;color:#1a1a1a;}
+.rep-tree-wrap{margin-top:12px;padding-top:10px;border-top:1px dashed #d5dde0;}
+.rep-tree-title{font-size:12px;font-weight:700;color:#555;margin-bottom:6px;}
+.rep-tree{list-style:none;margin:0;padding-left:4px;font-size:12px;}
+.rep-tree .rep-tree{padding-left:18px;border-left:1px solid #e3e9eb;margin-left:6px;}
+.rep-tree li{padding:1px 0;color:#333;}
+.rep-tree li.rep-folder{font-weight:600;color:#12384a;}
+.rep-tree li.rep-file{color:#555;font-weight:400;}
+.rep-foot{margin-top:26px;padding-top:12px;border-top:1px solid #d5dde0;font-size:11px;color:#999;text-align:center;}
+
+@media print{
+  body{background:#fff !important;}
+  body>*:not(#rep-overlay){display:none !important;}
+  #rep-overlay{position:static !important;background:#fff !important;display:block !important;}
+  .rep-toolbar{display:none !important;}
+  .rep-scroll{overflow:visible !important;padding:0 !important;display:block !important;}
+  .rep-doc{box-shadow:none !important;max-width:none !important;width:auto !important;padding:0 !important;border-radius:0;}
+  .rep-h2{page-break-after:avoid;}
+}
