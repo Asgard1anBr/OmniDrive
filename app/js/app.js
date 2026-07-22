@@ -16,8 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.7.0';
+  const VERSAO = '2.7.1';
   const CHANGELOG = [
+    { v: '2.7.1', data: '2026-07-13', itens: [
+      'Relatório: escolha de níveis de pasta (1, 2 ou 3 — padrão 2) para encurtar o PDF.',
+      'Pastas além do nível escolhido aparecem como "(N itens dentro)".',
+      'Botão de relatório movido para o cabeçalho, ao lado da versão.'
+    ]},
     { v: '2.7.0', data: '2026-07-13', itens: [
       'Novo: Relatório em PDF — botão no Painel gera um relatório imprimível dos drives.',
       'Escolha os drives (todos ou selecionados) e as seções (dados, saúde S.M.A.R.T., pastas, local/tags/observações, etc.).',
@@ -160,7 +165,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.7.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.7.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -554,13 +559,11 @@
       <div class="dash-section">
         <div class="hint">Mais cheios</div>
         <div class="dash-top">${topHtml}</div>
-      </div>
-      <button class="btn ghost" id="dash-relatorio" style="width:100%;margin-top:6px">📄 Gerar relatório (PDF)</button>`;
+      </div>`;
 
     el.querySelectorAll('.dash-top-item').forEach(item => item.addEventListener('click', () => {
       state.driveId = item.dataset.id; go('detalhe');
     }));
-    el.querySelector('#dash-relatorio').addEventListener('click', () => go('relatorio'));
   }
 
   // ================= BUSCA =================
@@ -1376,13 +1379,24 @@
     { id: 'datas', label: 'Datas (aquisição, cadastro)', on: false }
   ];
 
-  function buildTreeStatic(nodes) {
+  function contarItens(n) {
+    let t = n.children.length;
+    for (const c of n.children) t += contarItens(c);
+    return t;
+  }
+  // maxDepth: quantos níveis mostrar abaixo do topo (raiz do drive = curLevel 0)
+  function buildTreeStatic(nodes, maxDepth, curLevel) {
+    curLevel = curLevel || 0;
+    if (maxDepth == null) maxDepth = 3;
     let h = '<ul class="rep-tree">';
     for (const n of nodes) {
       const isFile = n.nome.startsWith('•');
       const nome = isFile ? n.nome.slice(1) : n.nome;
       h += '<li class="' + (isFile ? 'rep-file' : 'rep-folder') + '">' + (isFile ? '📄 ' : '📁 ') + esc(nome);
-      if (!isFile && n.children.length) h += buildTreeStatic(n.children);
+      if (!isFile && n.children.length) {
+        if (curLevel < maxDepth) h += buildTreeStatic(n.children, maxDepth, curLevel + 1);
+        else h += ' <span class="rep-more">(' + contarItens(n) + ' itens dentro)</span>';
+      }
       h += '</li>';
     }
     return h + '</ul>';
@@ -1407,7 +1421,7 @@
     return `<table class="rep-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
   }
 
-  function repFicha(d, secs) {
+  function repFicha(d, secs, niveis) {
     let rows = '';
     const add = (k, v) => { if (v != null && v !== '') rows += `<tr><th>${k}</th><td>${v}</td></tr>`; };
     if (secs.has('basicos')) {
@@ -1451,7 +1465,7 @@
     }
     let tree = '';
     if (secs.has('conteudo') && d.conteudo) {
-      if (d.conteudo.includes('›')) tree = buildTreeStatic(parseTree(d.conteudo));
+      if (d.conteudo.includes('›')) tree = buildTreeStatic(parseTree(d.conteudo), niveis);
       else { const its = splitConteudo(d.conteudo); if (its.length) tree = '<ul class="rep-tree">' + its.map(i => '<li class="rep-file">' + esc(i) + '</li>').join('') + '</ul>'; }
     }
     return `<div class="rep-ficha">
@@ -1473,7 +1487,7 @@
         <div class="rep-sub">${list.length} drive(s) · Gerado em ${now}</div>
       </div>`;
     if (cfg.fmt === 'ambos' || cfg.fmt === 'tabela') inner += `<h2 class="rep-h2">Resumo</h2>${repTabela(list, cfg.secs)}`;
-    if (cfg.fmt === 'ambos' || cfg.fmt === 'fichas') inner += `<h2 class="rep-h2">Fichas detalhadas</h2>${list.map(d => repFicha(d, cfg.secs)).join('')}`;
+    if (cfg.fmt === 'ambos' || cfg.fmt === 'fichas') inner += `<h2 class="rep-h2">Fichas detalhadas</h2>${list.map(d => repFicha(d, cfg.secs, cfg.niveis)).join('')}`;
     inner += `<div class="rep-foot">Gerado pelo OmniDrive ${VERSAO}</div></div>`;
 
     const ov = document.createElement('div'); ov.id = 'rep-overlay';
@@ -1526,6 +1540,16 @@
         <div class="rep-secs">${secPills}</div>
       </div>
 
+      <div class="rep-group" id="rep-niveis-group">
+        <div class="hint">Níveis de pasta a mostrar</div>
+        <div class="rep-niveis">
+          <button type="button" class="fpill" data-niv="1">1 — raiz + arquivos</button>
+          <button type="button" class="fpill on" data-niv="2">2 — raiz + 1 nível</button>
+          <button type="button" class="fpill" data-niv="3">3 — máximo</button>
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:6px">Menos níveis = relatório bem mais curto. O que ficar mais fundo aparece como "(N itens dentro)".</div>
+      </div>
+
       <button class="btn" id="rep-gerar" style="width:100%;margin-top:6px">📄 Gerar relatório</button>
       <div class="muted" style="font-size:12px;margin-top:8px;text-align:center">Abre uma prévia. No diálogo de impressão, escolha <b>"Salvar como PDF"</b> como destino.</div>`;
 
@@ -1543,7 +1567,14 @@
       el.querySelectorAll('.rep-fmt button').forEach(x => x.classList.remove('on'));
       b.classList.add('on');
     }));
-    el.querySelectorAll('.rep-secs button').forEach(b => b.addEventListener('click', () => b.classList.toggle('on')));
+    const nivGroup = el.querySelector('#rep-niveis-group');
+    function syncNiveis() { nivGroup.style.display = el.querySelector('.rep-secs button[data-sec="conteudo"]').classList.contains('on') ? '' : 'none'; }
+    el.querySelectorAll('.rep-secs button').forEach(b => b.addEventListener('click', () => { b.classList.toggle('on'); syncNiveis(); }));
+    syncNiveis();
+    el.querySelectorAll('.rep-niveis button').forEach(b => b.addEventListener('click', () => {
+      el.querySelectorAll('.rep-niveis button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+    }));
 
     el.querySelector('#rep-gerar').addEventListener('click', () => {
       const scope = el.querySelector('.rep-scope button.on').dataset.scope;
@@ -1555,7 +1586,8 @@
       const fmt = el.querySelector('.rep-fmt button.on').dataset.fmt;
       const secs = new Set([...el.querySelectorAll('.rep-secs button.on')].map(b => b.dataset.sec));
       if (!secs.size) { toast('Escolha ao menos uma seção de informação.'); return; }
-      gerarRelatorio(cat, { ids, fmt, secs });
+      const niveis = parseInt(el.querySelector('.rep-niveis button.on').dataset.niv, 10) || 2;
+      gerarRelatorio(cat, { ids, fmt, secs, niveis });
     });
   }
 
@@ -1620,6 +1652,7 @@
   }));
   document.querySelector('.brand').addEventListener('click', () => { if (state.authed) go('dashboard'); });
   document.getElementById('btnSobre').addEventListener('click', () => go('sobre'));
+  document.getElementById('btnRelatorio').addEventListener('click', () => { if (!state.authed) return go('entrar'); go('relatorio'); });
   document.getElementById('btnScan').addEventListener('click', () => {
     if (!state.authed) return go('entrar');
     abrirScanner();
