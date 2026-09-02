@@ -16,8 +16,11 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.7.2';
+  const VERSAO = '2.7.3';
   const CHANGELOG = [
+    { v: '2.7.3', data: '2026-07-13', itens: [
+      'Botão ↻ ao lado da versão: força atualização (limpa cache do Service Worker e recarrega a versão nova).'
+    ]},
     { v: '2.7.2', data: '2026-07-13', itens: [
       'Corrigido erro 403 "insufficient scopes" no login: reautoriza o Drive automaticamente quando o escopo antigo não o incluía.'
     ]},
@@ -168,7 +171,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.7.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.7.3', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -1656,6 +1659,17 @@
   document.querySelector('.brand').addEventListener('click', () => { if (state.authed) go('dashboard'); });
   document.getElementById('btnSobre').addEventListener('click', () => go('sobre'));
   document.getElementById('btnRelatorio').addEventListener('click', () => { if (!state.authed) return go('entrar'); go('relatorio'); });
+  document.getElementById('btnAtualizar').addEventListener('click', async () => {
+    const b = document.getElementById('btnAtualizar');
+    b.classList.add('spin');
+    try {
+      if ('serviceWorker' in navigator) { const rs = await navigator.serviceWorker.getRegistrations(); for (const r of rs) await r.unregister(); }
+      if (window.caches) { const ks = await caches.keys(); for (const k of ks) await caches.delete(k); }
+    } catch (e) { console.warn('Falha ao limpar cache:', e); }
+    // recarrega buscando tudo do servidor (sem SW/cache)
+    const u = new URL(location.href); u.searchParams.set('_r', Date.now());
+    location.replace(u.toString());
+  });
   document.getElementById('btnScan').addEventListener('click', () => {
     if (!state.authed) return go('entrar');
     abrirScanner();
