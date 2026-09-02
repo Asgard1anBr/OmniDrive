@@ -16,8 +16,11 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.7.1';
+  const VERSAO = '2.7.2';
   const CHANGELOG = [
+    { v: '2.7.2', data: '2026-07-13', itens: [
+      'Corrigido erro 403 "insufficient scopes" no login: reautoriza o Drive automaticamente quando o escopo antigo não o incluía.'
+    ]},
     { v: '2.7.1', data: '2026-07-13', itens: [
       'Relatório: escolha de níveis de pasta (1, 2 ou 3 — padrão 2) para encurtar o PDF.',
       'Pastas além do nível escolhido aparecem como "(N itens dentro)".',
@@ -165,7 +168,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.7.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.7.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [

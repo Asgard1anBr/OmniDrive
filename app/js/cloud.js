@@ -35,13 +35,27 @@
           callback: () => {}
         });
       }
+      let consentForcado = false;
       tokenClient.callback = (resp) => {
         if (resp.error) return reject(new Error(resp.error));
+        // Contas que autorizaram o app ANTES de existir o escopo do Drive recebem, no
+        // login silencioso, um token sem 'drive.file' -> Drive API responde 403.
+        // Se faltar, forçamos a tela de consentimento uma vez para reautorizar com o Drive.
+        const concedidos = resp.scope || '';
+        if (!concedidos.includes('drive.file')) {
+          if (!consentForcado) {
+            consentForcado = true;
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+            return;
+          }
+          return reject(new Error('Acesso ao Google Drive não concedido. No login, marque a permissão de Drive ("ver, editar, criar e excluir apenas os arquivos que você usa com este app") para sincronizar.'));
+        }
         accessToken = resp.access_token;
         tokenExpiresAt = Date.now() + (resp.expires_in * 1000);
         fetchUserInfo().finally(resolve);
       };
       tokenClient.error_callback = (err) => reject(new Error((err && err.type) || 'Login cancelado'));
+      // Tenta silencioso; se vier sem o escopo do Drive, o callback re-pede com consentimento.
       tokenClient.requestAccessToken({ prompt: '' });
     }));
   }
