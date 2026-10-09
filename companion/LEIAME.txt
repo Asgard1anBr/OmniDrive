@@ -67,11 +67,26 @@ COMO USAR (todo dia)
    (Ctrl+C ou clicar no X) — não faz mal nenhum.
 
 
+BOTÃO "LER DRIVE" (companion v1.5 ou mais novo)
+--------------------------------------------------------
+No menu do OmniDrive (ao lado de "Ler QR") há o botão "Ler drive".
+Plugue o HD, toque nele e o OmniDrive diz se é um drive CONHECIDO
+(mostra o que mudou e pergunta se quer atualizar) ou NOVO (abre o
+cadastro já preenchido com pastas, arquivos, capacidade e uso).
+- Drive com BitLocker: desbloqueie no Windows primeiro (senha no
+  Explorer) e toque em "Ler de novo". Mesmo bloqueado, ele costuma
+  ser reconhecido pelo modelo e tamanho.
+- A 1ª leitura depois de plugar um drive leva ~8 segundos.
+- Se aparecer "Companion não detectado": rode o iniciar-smart.bat.
+- Depois de atualizar o companion, FECHE a janela preta e abra o
+  .bat de novo (senão continua a versão velha e o botão não funciona).
+
+
 COMO SABER SE ESTÁ FUNCIONANDO
 --------------------------------------------------------
 Na janela preta deve aparecer algo como:
 
-  🔧 OmniDrive S.M.A.R.T. Companion v1.2
+  🔧 OmniDrive S.M.A.R.T. Companion v1.5
      smartctl: smartctl
      Servidor: http://localhost:7777
      Abra o OmniDrive no browser para ver a saúde dos drives.

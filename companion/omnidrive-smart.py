@@ -24,6 +24,7 @@ import subprocess
 import re
 import sys
 import os
+import ctypes
 
 # Evita crash de UnicodeEncodeError ao imprimir emoji em consoles Windows (cp1252)
 try:
@@ -32,8 +33,16 @@ try:
 except Exception:
     pass
 
-PORT = 7777
-COMPANION_VERSION = '1.4'
+PORT = int(os.environ.get('OMNIDRIVE_PORT', 7777))
+COMPANION_VERSION = '1.5'
+
+import threading
+import shutil
+from urllib.parse import urlparse, parse_qs
+
+# Só o OmniDrive (produção + dev local) pode ler as respostas. /scan expõe nomes de
+# pastas/arquivos, então não pode ficar aberto para qualquer site (CORS '*').
+ALLOWED_ORIGIN_RE = re.compile(r'^(https://asgard1anbr\.github\.io|http://(localhost|127\.0\.0\.1)(:\d+)?)$')
 
 def find_smartctl():
     paths = [
@@ -194,13 +203,162 @@ def parse_smart_text(device):
         return {'device': device, 'error': str(e)}
 
 
+# ---------- volumes (letra, rótulo, serial do disco, BitLocker) ----------
+_VOL_PS = r'''
+$ErrorActionPreference='SilentlyContinue'
+[Console]::OutputEncoding=[Text.Encoding]::UTF8
+$res=@()
+# cada cmdlet UMA vez (dentro do laço levava ~20s)
+$disks=@{}; foreach($d in (Get-Disk)){ $disks[[int]$d.Number]=$d }
+$pds=@{}; foreach($d in (Get-PhysicalDisk)){ $pds["$($d.DeviceId)"]=$d }
+$vols=@{}; foreach($d in (Get-Volume | Where-Object {$_.DriveLetter})){ $vols["$($d.DriveLetter)"]=$d }
+$bls=@{}; foreach($d in (Get-BitLockerVolume)){ $bls["$($d.MountPoint)".TrimEnd(':')]=$d }
+$lds=@{}; foreach($d in (Get-CimInstance Win32_LogicalDisk)){ $lds["$($d.DeviceID)".TrimEnd(':')]=$d }
+foreach($p in (Get-Partition | Where-Object {$_.DriveLetter})){
+  $dk=$disks[[int]$p.DiskNumber]
+  if(-not $dk -or $dk.IsBoot -or $dk.IsSystem){continue}
+  $l=[string]$p.DriveLetter
+  $v=$vols[$l]; $bl=$bls[$l]; $pd=$pds["$($p.DiskNumber)"]; $ld=$lds[$l]
+  $res+=[pscustomobject]@{
+    letter=$l; disk=[int]$p.DiskNumber; label="$($v.FileSystemLabel)"; fs="$($v.FileSystem)";
+    partSize=[int64]$p.Size; volSerial="$($ld.VolumeSerialNumber)";
+    friendly="$($dk.FriendlyName)"; diskSerial=("$($dk.SerialNumber)").Trim(); bus="$($dk.BusType)";
+    media="$($pd.MediaType)"; diskSize=[int64]$dk.Size; driveType="$($v.DriveType)";
+    bitlocker=[bool]($bl -and "$($bl.VolumeStatus)" -ne 'FullyDecrypted');
+    locked=[bool]($bl -and "$($bl.LockStatus)" -eq 'Locked')
+  }
+}
+ConvertTo-Json -InputObject @($res) -Compress
+'''
+
+_vol_lock = threading.Lock()
+_vol_cache = {'sig': None, 'volumes': []}
+
+def drive_signature():
+    """Assinatura barata (letras fixas/removíveis + se estão acessíveis) para só rodar o
+    PowerShell quando algo mudou — ex.: drive plugado ou desbloqueado no BitLocker."""
+    if os.name != 'nt':
+        return ()
+    k = ctypes.windll.kernel32
+    mask = k.GetLogicalDrives()
+    sig = []
+    for i in range(26):
+        if mask >> i & 1:
+            root = chr(65 + i) + ':\\'
+            if k.GetDriveTypeW(root) not in (2, 3):  # só removível/fixo
+                continue
+            try:
+                with os.scandir(root) as it:
+                    next(it, None)
+                ok = 1
+            except OSError:
+                ok = 0
+            sig.append((root[0], ok))
+    return tuple(sig)
+
+def _query_volumes():
+    try:
+        r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', _VOL_PS],
+                           capture_output=True, timeout=30)
+        txt = r.stdout.decode('utf-8', errors='replace').strip()
+        data = json.loads(txt) if txt else []
+        return [data] if isinstance(data, dict) else data
+    except Exception as e:
+        print(f'[OmniDrive] falha ao listar volumes: {e}')
+        return []
+
+def get_volumes():
+    if os.name != 'nt':
+        return []
+    sig = drive_signature()
+    with _vol_lock:
+        if sig != _vol_cache['sig']:
+            _vol_cache['volumes'] = _query_volumes()
+            _vol_cache['sig'] = sig
+        vols = [dict(v) for v in _vol_cache['volumes']]
+    for v in vols:  # uso muda a cada gravação: sempre fresco, nunca do cache
+        v['usedBytes'] = v['totalBytes'] = None
+        if not v.get('locked'):
+            try:
+                u = shutil.disk_usage(v['letter'] + ':\\')
+                v['usedBytes'], v['totalBytes'] = u.used, u.total
+            except OSError:
+                pass
+    return vols
+
+# ---------- scan de pastas/arquivos (mesmo formato do app: › por nível, • = arquivo) ----------
+_SKIP = {'system volume information', 'thumbs.db', 'desktop.ini', 'recycler'}
+
+def scan_tree(root, root_label, max_depth=3):
+    lines = [root_label]
+    counts = {'pastas': 0, 'arquivos': 0}
+    def walk(path, prof):
+        pastas, arquivos = [], []
+        try:
+            with os.scandir(path) as it:
+                for e in it:
+                    n = e.name
+                    if n.startswith('.') or n.startswith('$') or n.lower() in _SKIP:
+                        continue
+                    try:
+                        (pastas if e.is_dir(follow_symlinks=False) else arquivos).append(n)
+                    except OSError:
+                        continue
+        except OSError:
+            return
+        pastas.sort(key=str.lower); arquivos.sort(key=str.lower)
+        for n in pastas:
+            lines.append('›' * prof + ' ' + n); counts['pastas'] += 1
+            if prof < max_depth:
+                walk(os.path.join(path, n), prof + 1)
+        for n in arquivos:
+            lines.append('›' * prof + ' •' + n); counts['arquivos'] += 1
+    walk(root, 1)
+    return lines, counts
+
+
 class SmartHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
+    def _cors(self):
+        origin = self.headers.get('Origin') or ''
+        if origin and ALLOWED_ORIGIN_RE.match(origin):
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Vary', 'Origin')
         self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Private-Network', 'true')
+
+    def _json(self, obj, code=200):
+        body = json.dumps(obj, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self._cors()
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        u = urlparse(self.path)
+        q = parse_qs(u.query)
+        try:
+            if u.path == '/volumes':
+                return self._json({'ok': True, 'volumes': get_volumes()})
+            if u.path == '/scan':
+                letter = (q.get('letter', [''])[0] or '').upper()[:1]
+                depth = max(1, min(3, int((q.get('depth', ['3'])[0]) or 3)))
+                vol = next((v for v in get_volumes() if v['letter'].upper() == letter), None)
+                if not vol:
+                    return self._json({'ok': False, 'error': 'Volume não encontrado (ou é o disco do sistema).'}, 404)
+                if vol.get('locked'):
+                    return self._json({'ok': False, 'error': 'Volume bloqueado pelo BitLocker.', 'locked': True}, 423)
+                lines, counts = scan_tree(letter + ':\\', vol.get('label') or (letter + ':'), depth)
+                return self._json({'ok': True, 'tree': '\n'.join(lines), 'counts': counts,
+                                   'usedBytes': vol.get('usedBytes'), 'totalBytes': vol.get('totalBytes')})
+        except Exception as e:
+            return self._json({'ok': False, 'error': str(e)}, 500)
+
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self._cors()
         self.end_headers()
 
         if self.path == '/smart' or self.path.startswith('/smart?'):
@@ -225,9 +383,7 @@ class SmartHandler(http.server.BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self._cors()
         self.end_headers()
 
     def log_message(self, fmt, *args):
@@ -255,7 +411,8 @@ def main():
             print('⚠️  Recomendado rodar como Administrador para ler S.M.A.R.T.')
             print()
 
-    server = http.server.HTTPServer(('127.0.0.1', PORT), SmartHandler)
+    # Threading: um /scan demorado em HD lento não pode travar /ping e /volumes
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), SmartHandler)
     print(f'🔧 OmniDrive S.M.A.R.T. Companion v{COMPANION_VERSION}')
     print(f'   smartctl: {SMARTCTL or "NÃO ENCONTRADO"}')
     print(f'   Servidor: http://localhost:{PORT}')

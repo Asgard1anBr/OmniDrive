@@ -1,5 +1,15 @@
 # Changelog — OmniDrive S.M.A.R.T. Companion
 
+## v1.5 — 2026-10-09
+- Novo `/volumes`: letra, rótulo, serial do volume e do disco, barramento, tipo de mídia, espaço usado
+  e status do **BitLocker** (bloqueado/desbloqueado) dos drives conectados. Disco do sistema é omitido.
+  Só reconsulta o Windows quando algo muda (drive plugado/desbloqueado); a 1ª leitura leva ~8 s.
+- Novo `/scan?letter=D`: lê pastas e arquivos (3 níveis) direto do drive, sem o seletor do navegador.
+  Recusa volume bloqueado (423) e o disco do sistema.
+- Segurança: CORS deixa de ser `*` — só o OmniDrive (github.io de produção e localhost) lê as respostas,
+  pois `/scan` expõe nomes de arquivos. Servidor agora é multithread (scan longo não trava o `/ping`).
+- Variável `OMNIDRIVE_PORT` permite trocar a porta (testes).
+
 ## v1.4 — 2026-07-13
 - Corrigido "abre e fecha rápido" com Python da Microsoft Store: o `.bat`
   agora localiza o caminho REAL do python.exe (busca em %LOCALAPPDATA%\Python),

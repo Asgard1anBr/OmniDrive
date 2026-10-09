@@ -318,6 +318,13 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
 - **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
   `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
   `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v2.8.0** (2026-10-09) — **Ler drive** (botão no nav). O companion (v1.5) expõe `/volumes` e `/scan`; o app
+  agrupa volumes por disco físico, **identifica** se é drive conhecido ou novo e, se conhecido, mostra o diff
+  (pastas/arquivos novos e removidos, uso) antes de aplicar. Identificação por sinais combinados — serial do
+  volume (100), serial do disco (100), nome = rótulo (60), mesmo modelo+tamanho (40), capacidade compatível (+20) —
+  porque **caixas USB costumam reportar serial falso** (`0123456789ABCDEF`) e **BitLocker bloqueado esconde o
+  rótulo** (aí só modelo+tamanho identificam). A identidade fica em `drive.ident` (gravada ao atualizar/cadastrar).
+  Corrigido bug: `smart`/`ident` não eram copiados ao salvar drive novo. CORS do companion restrito ao OmniDrive.
 - **v1.1** (2026-07-12) — **conserto definitivo da câmera**: frames desenhados em `<canvas>` via `drawImage`
   (o `<video>` fica oculto de 2px, só como fonte); `BarcodeDetector.detect(canvas)`. Nova tela **Histórico de
   Versões** (botão no Sobre): constante `VERSAO` + array `CHANGELOG` em `app.js` alimentam Sobre e a tela;

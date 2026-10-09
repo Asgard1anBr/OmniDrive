@@ -16,8 +16,17 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.7.3';
+  const VERSAO = '2.8.0';
   const CHANGELOG = [
+    { v: '2.8.0', data: '2026-10-09', itens: [
+      'Novo botão "Ler drive": lê o que está plugado e diz se é um drive conhecido ou novo.',
+      'Drive conhecido: mostra o que mudou (pastas/arquivos novos e removidos, espaço usado) e pergunta se quer atualizar.',
+      'Drive novo: abre o cadastro já preenchido (nome, capacidade, uso, partições, pastas e arquivos).',
+      'Drive protegido pelo BitLocker: é reconhecido mesmo bloqueado e avisa para desbloquear antes de ler.',
+      'Identificação por sinais combinados (serial do volume, serial do disco, nome, modelo e tamanho) — não depende de um só.',
+      'Disco com várias partições (D:, E:) vira um único drive. Requer o companion v1.5 (reinicie o iniciar-smart.bat).',
+      'Corrigido: ao salvar um drive NOVO, a saúde S.M.A.R.T. escaneada não era gravada.'
+    ]},
     { v: '2.7.3', data: '2026-07-13', itens: [
       'Botão ↻ ao lado da versão: força atualização (limpa cache do Service Worker e recarrega a versão nova).'
     ]},
@@ -171,7 +180,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.7.3', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.8.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -922,7 +931,7 @@
   // ================= CADASTRO =================
   function renderCadastro(cat, drive) {
     const editing = !!drive;
-    const d = drive || {};
+    const d = drive || state.draft || {}; // draft = drive lido pelo "Ler drive", ainda não salvo
     const id = d.id || gerarId(cat);
 
     const estadoOpts = ['<option value="">—</option>'].concat(
@@ -1062,7 +1071,7 @@
     echoParse(capEl.value, eCap); updUso(); // eco inicial (modo edição)
 
     el.querySelector('#add-local').addEventListener('click', () => abrirNovoLocal(el.querySelector('#f-local')));
-    el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; go('busca'); });
+    el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; state.draft = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
     function smartApply(picked) {
       d.smart = { score: picked.score, health: picked.health, temperature: picked.temperature, powerOnHours: picked.powerOnHours, reallocated: picked.reallocated || 0, pending: picked.pending || 0, uncorrectable: picked.uncorrectable || 0, model: picked.model, serial: picked.serial, checkedAt: new Date().toISOString() };
@@ -1339,8 +1348,13 @@
       alvo.tags = el.querySelector('#f-tags').value.split(',').map(s => s.trim()).filter(Boolean);
       alvo.observacoes = el.querySelector('#f-obs').value.trim();
       alvo.atualizadoEm = new Date().toISOString();
+      // smart/ident vivem em `d` (objeto da tela): sem copiar, drive NOVO (ou modo local, que relê o
+      // catálogo do disco) perdia a saúde S.M.A.R.T. e a identificação do hardware ao salvar.
+      if (d.smart) alvo.smart = d.smart;
+      if (d.ident) alvo.ident = d.ident;
       if (!editing) cat2.drives.unshift(alvo);
       store.save(cat2);
+      state.draft = null;
       state.editId = null; state.driveId = id;
       toast(editing ? 'Alterações salvas' : 'Drive salvo');
       go('detalhe');
@@ -1373,6 +1387,187 @@
       }
     });
     document.getElementById('e-local').addEventListener('click', () => { mode = 'local'; state.authed = true; go('dashboard'); });
+  }
+
+  // ================= LER DRIVE (identifica drive plugado: conhecido ou novo) =================
+  async function companionGet(path, ms) {
+    const r = await fetch(SMART_URL + path, { signal: AbortSignal.timeout(ms || 15000) });
+    return r.json(); // 404/423 também trazem JSON com {ok:false,error}
+  }
+  // Várias caixas USB reportam serial falso (ex.: 0123456789ABCDEF) — não serve para identificar.
+  function serialUtil(s) {
+    s = (s || '').toString().trim();
+    if (s.length < 6 || /^(.)\1+$/.test(s) || /^0123456789/i.test(s)) return '';
+    return s.toLowerCase();
+  }
+  // Um disco físico pode ter várias partições (D:, E:) = 1 drive no catálogo.
+  function agruparDiscos(vols) {
+    const m = new Map();
+    for (const v of vols) {
+      if (!m.has(v.disk)) m.set(v.disk, { disk: v.disk, friendly: v.friendly, diskSerial: v.diskSerial, diskSize: v.diskSize, bus: v.bus, media: v.media, vols: [] });
+      m.get(v.disk).vols.push(v);
+    }
+    return [...m.values()].map(g => Object.assign(g, {
+      locked: g.vols.some(v => v.locked), bitlocker: g.vols.some(v => v.bitlocker),
+      nome: (g.vols.find(v => v.label) || {}).label || g.friendly || ('Disco ' + g.disk)
+    }));
+  }
+  // Pontua cada drive do catálogo contra o disco lido; combina sinais (nenhum é infalível sozinho).
+  function identificarDisco(g, cat) {
+    const labels = g.vols.map(v => norm(v.label)).filter(Boolean);
+    const volSer = g.vols.map(v => (v.volSerial || '').toLowerCase()).filter(Boolean);
+    const dser = serialUtil(g.diskSerial);
+    const capGB = g.diskSize / 1e9;
+    let best = null;
+    for (const d of cat.drives) {
+      const id = d.ident || {};
+      let s = 0; const why = [];
+      if (volSer.length && (id.volSerials || []).some(x => volSer.includes(x))) { s += 100; why.push('serial do volume'); }
+      const conhecidos = [id.diskSerial, d.serial, d.smart && d.smart.serial].map(serialUtil).filter(Boolean);
+      if (dser && conhecidos.includes(dser)) { s += 100; why.push('serial do disco'); }
+      if (labels.length && labels.includes(norm(d.nome))) { s += 60; why.push('nome igual ao rótulo do volume'); }
+      if (id.friendly && id.diskSize && id.friendly === g.friendly && Math.abs(id.diskSize - g.diskSize) < 1e6) { s += 40; why.push('mesmo modelo e tamanho'); }
+      if (d.capacidadeGB) {
+        const diff = Math.abs(capGB - d.capacidadeGB) / d.capacidadeGB;
+        if (diff < 0.08) s += 20; else if (diff > 0.3 && s < 100) s -= 50;
+      }
+      if (s > 0 && (!best || s > best.s)) best = { d, s, why };
+    }
+    if (!best) return null;
+    const nivel = best.s >= 100 ? 'exato' : best.s >= 55 ? 'provavel' : null;
+    return nivel ? { drive: best.d, nivel, motivo: best.why.join(' + ') } : null;
+  }
+  function mergeIdent(old, g) {
+    old = old || {};
+    const uniq = a => [...new Set(a.filter(Boolean))];
+    return {
+      volSerials: uniq([...(old.volSerials || []), ...g.vols.map(v => (v.volSerial || '').toLowerCase())]),
+      labels: uniq([...(old.labels || []), ...g.vols.map(v => v.label)]),
+      diskSerial: g.diskSerial || old.diskSerial || '', friendly: g.friendly, diskSize: g.diskSize,
+      bus: g.bus, bitlocker: g.bitlocker, vistoEm: new Date().toISOString()
+    };
+  }
+  async function lerConteudoDisco(g) {
+    const partes = []; let used = 0; const counts = { pastas: 0, arquivos: 0 };
+    for (const v of g.vols) {
+      if (v.locked) continue;
+      const r = await companionGet('/scan?letter=' + encodeURIComponent(v.letter), 180000);
+      if (!r.ok) throw new Error(r.error || ('falha ao ler ' + v.letter + ':'));
+      partes.push(r.tree); used += r.usedBytes || 0;
+      counts.pastas += r.counts.pastas; counts.arquivos += r.counts.arquivos;
+    }
+    return { tree: partes.join('\n'), usedGB: Math.round(used / 1e8) / 10, counts };
+  }
+  // caminhos completos (sem o nome da raiz, que muda) — para comparar leitura antiga x nova
+  function caminhosArvore(texto) {
+    const pastas = new Set(), arquivos = new Set();
+    (function rec(nodes, pref) {
+      for (const n of nodes) {
+        const f = n.nome.startsWith('•'), nome = f ? n.nome.slice(1) : n.nome, p = pref + '/' + nome;
+        (f ? arquivos : pastas).add(p); rec(n.children, p);
+      }
+    })([].concat(...parseTree(texto || '').map(r => r.children)), '');
+    return { pastas, arquivos };
+  }
+  function diffArvores(antigo, novo) {
+    const a = caminhosArvore(antigo), b = caminhosArvore(novo);
+    const falta = (x, y) => [...x].filter(p => !y.has(p));
+    return { novasPastas: falta(b.pastas, a.pastas), novosArquivos: falta(b.arquivos, a.arquivos),
+             remPastas: falta(a.pastas, b.pastas), remArquivos: falta(a.arquivos, b.arquivos) };
+  }
+  const fmtBytes = b => b == null ? '—' : fmtGB(b / 1e9);
+
+  function lerDrive() {
+    const m = modal('<h3>💽 Ler drive</h3><div id="ld-body"></div>');
+    const body = m.querySelector('#ld-body');
+    const setBody = h => { body.innerHTML = h; };
+    const fechar = () => m.remove();
+
+    async function listar() {
+      setBody('<p class="muted">Lendo os drives conectados… <br><small>A primeira leitura pode levar alguns segundos.</small></p>');
+      let r;
+      try { r = await companionGet('/volumes', 60000); }
+      catch (e) {
+        setBody(`<p style="color:var(--warn)">Companion não detectado.</p>
+          <p class="muted" style="font-size:13px">Para ler drives plugados, rode o <b>iniciar-smart.bat</b> (pasta <i>companion</i>) neste computador e tente de novo. No celular esta função não está disponível.</p>
+          <div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button><button class="btn" id="ld-reler">Tentar de novo</button></div>`);
+        body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar; return;
+      }
+      if (!r.ok) { setBody(`<p style="color:var(--warn)">${esc(r.error || 'Falha ao listar drives.')}</p><div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button></div>`); body.querySelector('#ld-fechar').onclick = fechar; return; }
+      const discos = agruparDiscos(r.volumes || []);
+      if (!discos.length) {
+        setBody(`<p>Nenhum drive externo encontrado.</p><p class="muted" style="font-size:13px">Plugue o drive e toque em "Ler de novo". (O disco do sistema não é listado.)</p>
+          <div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button><button class="btn" id="ld-reler">Ler de novo</button></div>`);
+        body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar; return;
+      }
+      const cat = store.load();
+      const itens = discos.map(g => ({ g, id: identificarDisco(g, cat) }));
+      const cards = itens.map(({ g, id }, i) => {
+        const letras = g.vols.map(v => v.letter + ':').join(' ');
+        const total = fmtGB(g.diskSize / 1e9);
+        const usado = g.vols.reduce((s, v) => s + (v.usedBytes || 0), 0);
+        const info = [letras, total, g.locked ? null : 'usado ' + fmtBytes(usado), g.bus, g.bitlocker ? 'BitLocker' : null].filter(Boolean).join(' · ');
+        let badge, acoes, titulo = esc(g.nome), nota = '';
+        if (id) { titulo = esc(id.drive.nome); nota = `<div class="ld-sub">Identificado por: ${esc(id.motivo)}${id.nivel === 'provavel' ? ' — confirme se é este mesmo' : ''}</div>`; }
+        if (g.locked) {
+          badge = '<span class="ld-badge ld-lock">🔒 Bloqueado</span>';
+          nota += `<div class="ld-sub">Drive protegido pelo BitLocker. Desbloqueie no Windows (Explorer → clique no drive → senha) e toque em <b>Ler de novo</b>.</div>`;
+          acoes = '';
+        } else if (id) {
+          badge = `<span class="ld-badge ${id.nivel === 'exato' ? 'ld-known' : 'ld-maybe'}">${id.nivel === 'exato' ? 'Conhecido' : 'Provável'}</span>`;
+          acoes = `<button class="btn" data-i="${i}" data-act="atualizar">Atualizar conteúdo</button><button class="btn ghost" data-i="${i}" data-act="novo">É outro drive</button>`;
+        } else {
+          badge = '<span class="ld-badge ld-new">Novo</span>';
+          acoes = `<button class="btn" data-i="${i}" data-act="novo">Cadastrar este drive</button>`;
+        }
+        return `<div class="ld-card"><div class="ld-head"><span class="ld-name">${DRIVE_ICON[id ? id.drive.tipo : ''] || '💽'} ${titulo}</span>${badge}</div>
+          <div class="ld-sub">${esc(info)}</div>${nota}${acoes ? `<div class="ld-actions">${acoes}</div>` : ''}</div>`;
+      }).join('');
+      setBody(`${cards}<div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button><button class="btn ghost" id="ld-reler">↻ Ler de novo</button></div>`);
+      body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar;
+      body.querySelectorAll('button[data-act]').forEach(b => b.addEventListener('click', () => agir(itens[+b.dataset.i], b.dataset.act)));
+    }
+
+    async function agir({ g, id }, act) {
+      setBody('<p class="muted">Lendo pastas e arquivos… <br><small>Em HD grande pode levar um pouco.</small></p>');
+      let lido;
+      try { lido = await lerConteudoDisco(g); }
+      catch (e) {
+        setBody(`<p style="color:var(--warn)">Erro ao ler: ${esc(e.message || 'falha desconhecida')}</p><div class="form-actions"><button class="btn" id="ld-voltar">Voltar</button></div>`);
+        body.querySelector('#ld-voltar').onclick = listar; return;
+      }
+      if (act === 'novo') {
+        const tipo = g.media === 'SSD' ? 'SSD' : g.media === 'HDD' ? 'HD' : g.bus === 'NVMe' ? 'NVMe' : (g.bus === 'USB' && g.diskSize / 1e9 <= 256 ? 'PenDrive' : null);
+        state.draft = {
+          nome: (g.vols.find(v => v.label) || {}).label || '', tipo,
+          capacidadeGB: Math.round(g.diskSize / 1e9), usadoGB: lido.usedGB,
+          particoes: g.vols.length, conexao: g.bus === 'USB' ? 'USB' : (g.bus || ''),
+          criptografia: g.bitlocker ? 'sim' : null, conteudo: lido.tree, ident: mergeIdent({}, g)
+        };
+        state.editId = null; fechar(); go('cadastro'); return;
+      }
+      const drive = id.drive, d = diffArvores(drive.conteudo, lido.tree);
+      const semArvore = !(drive.conteudo || '').includes('›');
+      const sem = !(d.novasPastas.length + d.novosArquivos.length + d.remPastas.length + d.remArquivos.length);
+      const exemplos = [...d.novosArquivos, ...d.novasPastas].slice(0, 6).map(p => `<li>${esc(p.replace(/^\//, ''))}</li>`).join('');
+      setBody(`<p><b>${esc(drive.nome)}</b> — o que mudou desde a última leitura:</p>
+        ${semArvore ? '<p class="muted" style="font-size:13px">O conteúdo atual é texto livre; será substituído pela árvore lida do drive.</p>' :
+          sem ? '<p style="color:var(--cyan)">Nenhuma mudança nas pastas e arquivos.</p>' :
+          `<ul class="ld-diff"><li>➕ ${d.novasPastas.length} pasta(s) · ${d.novosArquivos.length} arquivo(s) novo(s)</li><li>➖ ${d.remPastas.length} pasta(s) · ${d.remArquivos.length} arquivo(s) removido(s)</li></ul>
+           ${exemplos ? `<div class="ld-sub">Alguns novos:</div><ul class="ld-ex">${exemplos}</ul>` : ''}`}
+        <div class="ld-sub">Espaço usado: ${drive.usadoGB != null ? fmtGB(drive.usadoGB) : '—'} → <b>${fmtGB(lido.usedGB)}</b></div>
+        <div class="form-actions"><button class="btn ghost" id="ld-voltar">Cancelar</button><button class="btn" id="ld-aplicar">Aplicar atualização</button></div>`);
+      body.querySelector('#ld-voltar').onclick = listar;
+      body.querySelector('#ld-aplicar').onclick = () => {
+        const cat2 = store.load(), alvo = cat2.drives.find(x => x.id === drive.id);
+        if (!alvo) { toast('Drive não encontrado no catálogo.'); return; }
+        alvo.conteudo = lido.tree; alvo.usadoGB = lido.usedGB;
+        if (!alvo.capacidadeGB) alvo.capacidadeGB = Math.round(g.diskSize / 1e9);
+        alvo.ident = mergeIdent(alvo.ident, g); alvo.atualizadoEm = new Date().toISOString();
+        store.save(cat2); state.driveId = alvo.id; toast('Drive atualizado'); fechar(); go('detalhe');
+      };
+    }
+    listar();
   }
 
   // ================= RELATÓRIO =================
@@ -1653,12 +1848,13 @@
 
   document.querySelectorAll('.navbtn[data-view]').forEach(t => t.addEventListener('click', () => {
     if (!state.authed) return go('entrar');
-    if (t.dataset.view === 'cadastro') state.editId = null;
+    if (t.dataset.view === 'cadastro') { state.editId = null; state.draft = null; }
     go(t.dataset.view);
   }));
   document.querySelector('.brand').addEventListener('click', () => { if (state.authed) go('dashboard'); });
   document.getElementById('btnSobre').addEventListener('click', () => go('sobre'));
   document.getElementById('btnRelatorio').addEventListener('click', () => { if (!state.authed) return go('entrar'); go('relatorio'); });
+  document.getElementById('btnLerDrive').addEventListener('click', () => { if (!state.authed) return go('entrar'); lerDrive(); });
   document.getElementById('btnAtualizar').addEventListener('click', async () => {
     const b = document.getElementById('btnAtualizar');
     b.classList.add('spin');
