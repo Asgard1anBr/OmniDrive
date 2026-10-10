@@ -34,7 +34,7 @@ except Exception:
     pass
 
 PORT = int(os.environ.get('OMNIDRIVE_PORT', 7777))
-COMPANION_VERSION = '1.5'
+COMPANION_VERSION = '1.5.1'
 
 import threading
 import shutil
@@ -276,8 +276,13 @@ def get_volumes():
             _vol_cache['volumes'] = _query_volumes()
             _vol_cache['sig'] = sig
         vols = [dict(v) for v in _vol_cache['volumes']]
+    legivel = dict(sig)
     for v in vols:  # uso muda a cada gravação: sempre fresco, nunca do cache
         v['usedBytes'] = v['totalBytes'] = None
+        # Sem admin o Windows não informa o BitLocker; volume que não abre = tratado como bloqueado.
+        # Evita "atualizar" um drive com conteúdo vazio por ter lido um volume trancado.
+        if legivel.get(v['letter'].upper()) == 0:
+            v['locked'] = True
         if not v.get('locked'):
             try:
                 u = shutil.disk_usage(v['letter'] + ':\\')

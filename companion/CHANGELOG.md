@@ -1,5 +1,9 @@
 # Changelog — OmniDrive S.M.A.R.T. Companion
 
+## v1.5.1 — 2026-10-09
+- Volume que não abre (ex.: BitLocker trancado, ou companion sem admin) passa a ser tratado como bloqueado,
+  em vez de devolver leitura vazia que poderia zerar o conteúdo de um drive catalogado.
+
 ## v1.5 — 2026-10-09
 - Novo `/volumes`: letra, rótulo, serial do volume e do disco, barramento, tipo de mídia, espaço usado
   e status do **BitLocker** (bloqueado/desbloqueado) dos drives conectados. Disco do sistema é omitido.

@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.8.0';
+  const VERSAO = '2.8.1';
   const CHANGELOG = [
+    { v: '2.8.1', data: '2026-10-09', itens: [
+      'Ler drive: aviso claro quando o companion está desatualizado (precisa v1.5).',
+      'Trava de segurança: leitura vazia de drive já catalogado não sobrescreve nada; volume trancado conta como bloqueado.'
+    ]},
     { v: '2.8.0', data: '2026-10-09', itens: [
       'Novo botão "Ler drive": lê o que está plugado e diz se é um drive conhecido ou novo.',
       'Drive conhecido: mostra o que mudou (pastas/arquivos novos e removidos, espaço usado) e pergunta se quer atualizar.',
@@ -180,7 +184,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.8.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.8.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -1493,7 +1497,13 @@
           <div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button><button class="btn" id="ld-reler">Tentar de novo</button></div>`);
         body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar; return;
       }
-      if (!r.ok) { setBody(`<p style="color:var(--warn)">${esc(r.error || 'Falha ao listar drives.')}</p><div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button></div>`); body.querySelector('#ld-fechar').onclick = fechar; return; }
+      if (!r.ok) {
+        const velho = /rota desconhecida/i.test(r.error || ''); // companion v1.4 ou anterior não tem /volumes
+        setBody(`<p style="color:var(--warn)">${velho ? 'Companion desatualizado.' : esc(r.error || 'Falha ao listar drives.')}</p>
+          ${velho ? '<p class="muted" style="font-size:13px">Esta função precisa do companion v1.5. Feche a janela preta do companion e abra o <b>iniciar-smart.bat</b> de novo para carregar a versão nova.</p>' : ''}
+          <div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button><button class="btn" id="ld-reler">Tentar de novo</button></div>`);
+        body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar; return;
+      }
       const discos = agruparDiscos(r.volumes || []);
       if (!discos.length) {
         setBody(`<p>Nenhum drive externo encontrado.</p><p class="muted" style="font-size:13px">Plugue o drive e toque em "Ler de novo". (O disco do sistema não é listado.)</p>
@@ -1534,6 +1544,11 @@
       try { lido = await lerConteudoDisco(g); }
       catch (e) {
         setBody(`<p style="color:var(--warn)">Erro ao ler: ${esc(e.message || 'falha desconhecida')}</p><div class="form-actions"><button class="btn" id="ld-voltar">Voltar</button></div>`);
+        body.querySelector('#ld-voltar').onclick = listar; return;
+      }
+      // trava de segurança: leitura vazia de um drive que já tinha conteúdo = algo deu errado (ex.: volume trancado)
+      if (id && !lido.counts.pastas && !lido.counts.arquivos && (id.drive.conteudo || '').includes('›')) {
+        setBody('<p style="color:var(--warn)">A leitura voltou vazia, mas este drive tinha conteúdo catalogado.</p><p class="muted" style="font-size:13px">Por segurança nada foi alterado. Confira se o drive está desbloqueado e acessível e tente de novo.</p><div class="form-actions"><button class="btn" id="ld-voltar">Voltar</button></div>');
         body.querySelector('#ld-voltar').onclick = listar; return;
       }
       if (act === 'novo') {
