@@ -318,6 +318,12 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
 - **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
   `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
   `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v2.10.0** (2026-10-09) — **Ler drive reconhece drives já cadastrados antes da v2.8.** Problema: sem `drive.ident`
+  gravado e com o nome do volume diferente da etiqueta do catálogo, um drive conhecido aparecia como "Novo".
+  Correção: o app chama `/smart` em paralelo a `/volumes` e usa o **serial real do HD** (S.M.A.R.T. atravessa a
+  caixa USB) como sinal forte (+100) e o modelo (+30); ao não reconhecer, oferece **vínculo manual** ("É um drive
+  que já tenho", lista ordenada por capacidade parecida + filtro), que grava a identidade para as próximas vezes.
+  Ao ler/atualizar também grava `smart`, `modelo` e `serial` reais.
 - **v2.9.0** (2026-10-09) — **instalação do companion para máquinas novas**, sem depender da pasta do projeto.
   O deploy (`deploy.yml`) copia `companion/*` para `app/companion/` antes de publicar; o app oferece
   `.../OmniDrive/companion/instalar-companion.bat` num guia (botão "Primeira vez neste computador?") que explica
