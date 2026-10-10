@@ -2,7 +2,7 @@
 
 ## v1.6 — 2026-10-09
 - Novo `instalar-companion.bat`: instalador de um clique para máquinas novas. Instala Python e smartmontools
-  via winget se faltarem, baixa o companion do próprio site do OmniDrive para %LOCALAPPDATA%OmniDrivempanion
+  via winget se faltarem, baixa o companion do próprio site do OmniDrive para `%LOCALAPPDATA%\OmniDrive\companion`
   e cria o atalho "OmniDrive Companion" na Área de Trabalho. Rodar de novo atualiza o companion.
 - O site publica o companion em ./companion/ (o deploy copia os arquivos; a fonte continua sendo a pasta companion/).
 
