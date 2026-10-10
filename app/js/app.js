@@ -16,8 +16,14 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.8.1';
+  const VERSAO = '2.9.0';
   const CHANGELOG = [
+    { v: '2.9.0', data: '2026-10-09', itens: [
+      'O botão "Ler drive" ganhou destaque: verde-azulado, centralizado abaixo do menu.',
+      'Novo guia "Instalar o companion": explica por que ele é necessário e baixa um instalador de um clique, sem depender de nenhuma pasta.',
+      'Para máquinas novas: o instalador coloca Python e smartmontools (se faltarem), baixa o companion e cria o atalho na Área de Trabalho.',
+      'Quando o companion não é encontrado, o Ler drive agora leva direto ao guia de instalação.'
+    ]},
     { v: '2.8.1', data: '2026-10-09', itens: [
       'Ler drive: aviso claro quando o companion está desatualizado (precisa v1.5).',
       'Trava de segurança: leitura vazia de drive já catalogado não sobrescreve nada; volume trancado conta como bloqueado.'
@@ -184,7 +190,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.8.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.9.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -1481,6 +1487,34 @@
   }
   const fmtBytes = b => b == null ? '—' : fmtGB(b / 1e9);
 
+  // Explica por que o companion existe e entrega o instalador (hospedado no próprio site).
+  function abrirCompanionAjuda() {
+    const m = modal(`<div class="cp-box">
+      <h3>🔧 Companion do OmniDrive</h3>
+      <div class="cp-h">Por que instalar?</div>
+      <p class="cp-why">Por segurança, o navegador não enxerga o hardware do computador. Para o OmniDrive
+        <b>ler a saúde (S.M.A.R.T.)</b> dos HDs, <b>reconhecer um drive plugado</b> (conhecido ou novo, até com BitLocker)
+        e <b>ler as pastas e arquivos sozinho</b>, ele precisa de um programa pequeno rodando no seu PC: o <b>companion</b>.</p>
+      <ul class="cp-list">
+        <li>Roda <b>só no seu computador</b> e conversa apenas com o OmniDrive. O conteúdo dos seus drives <b>não vai para a internet</b>.</li>
+        <li>Instale <b>uma vez em cada PC</b> em que for plugar drives. Busca, cadastro, relatório e QR funcionam sem ele, em qualquer aparelho.</li>
+        <li>O "Ler drive" funciona só em <b>Windows</b>.</li>
+      </ul>
+      <div class="cp-h">Como instalar (cerca de 1 minuto)</div>
+      <ol class="cp-steps">
+        <li>Baixe o instalador abaixo e abra o arquivo.</li>
+        <li>Aceite o pedido de administrador. Ele instala o que faltar (Python e smartmontools), baixa o companion e cria o atalho <b>"OmniDrive Companion"</b> na Área de Trabalho.</li>
+        <li>Para usar: abra o atalho e deixe a janela preta aberta. Depois, toque em <b>Ler drive</b>.</li>
+      </ol>
+      <div class="cp-dl"><a class="btn" href="companion/instalar-companion.bat" download="instalar-companion.bat">⬇ Baixar instalador</a></div>
+      <div class="cp-note">O Windows ou o navegador podem avisar por ser um arquivo .bat — escolha <b>Manter</b> / <b>Executar mesmo assim</b>.<br>
+        Para atualizar o companion no futuro, rode o instalador de novo.<br>
+        Prefere instalar à mão? <a href="companion/LEIAME.txt" target="_blank" rel="noopener">Ver o passo a passo manual</a>.</div>
+      <div class="form-actions" style="margin-top:14px"><button class="btn ghost" id="cp-fechar">Fechar</button></div>
+    </div>`);
+    m.querySelector('#cp-fechar').onclick = () => m.remove();
+  }
+
   function lerDrive() {
     const m = modal('<h3>💽 Ler drive</h3><div id="ld-body"></div>');
     const body = m.querySelector('#ld-body');
@@ -1493,16 +1527,19 @@
       try { r = await companionGet('/volumes', 60000); }
       catch (e) {
         setBody(`<p style="color:var(--warn)">Companion não detectado.</p>
-          <p class="muted" style="font-size:13px">Para ler drives plugados, rode o <b>iniciar-smart.bat</b> (pasta <i>companion</i>) neste computador e tente de novo. No celular esta função não está disponível.</p>
-          <div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button><button class="btn" id="ld-reler">Tentar de novo</button></div>`);
-        body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar; return;
+          <p class="muted" style="font-size:13px">Se já instalou: abra o atalho <b>"OmniDrive Companion"</b> (ou o <b>iniciar-smart.bat</b>), deixe a janela preta aberta e toque em "Tentar de novo".</p>
+          <p class="muted" style="font-size:13px">Primeira vez neste computador? É preciso instalar o companion. No celular esta função não está disponível.</p>
+          <div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button><button class="btn ghost" id="ld-instalar">Como instalar</button><button class="btn" id="ld-reler">Tentar de novo</button></div>`);
+        body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar;
+        body.querySelector('#ld-instalar').onclick = () => { fechar(); abrirCompanionAjuda(); }; return;
       }
       if (!r.ok) {
         const velho = /rota desconhecida/i.test(r.error || ''); // companion v1.4 ou anterior não tem /volumes
         setBody(`<p style="color:var(--warn)">${velho ? 'Companion desatualizado.' : esc(r.error || 'Falha ao listar drives.')}</p>
-          ${velho ? '<p class="muted" style="font-size:13px">Esta função precisa do companion v1.5. Feche a janela preta do companion e abra o <b>iniciar-smart.bat</b> de novo para carregar a versão nova.</p>' : ''}
-          <div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button><button class="btn" id="ld-reler">Tentar de novo</button></div>`);
-        body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar; return;
+          ${velho ? '<p class="muted" style="font-size:13px">Esta função precisa do companion v1.5 ou mais novo. Rode o <b>instalador</b> de novo para atualizar (ou, se usa a pasta do projeto, feche a janela preta e abra o <b>iniciar-smart.bat</b>).</p>' : ''}
+          <div class="form-actions"><button class="btn ghost" id="ld-fechar">Fechar</button>${velho ? '<button class="btn ghost" id="ld-instalar">Baixar instalador</button>' : ''}<button class="btn" id="ld-reler">Tentar de novo</button></div>`);
+        body.querySelector('#ld-fechar').onclick = fechar; body.querySelector('#ld-reler').onclick = listar;
+        const bi = body.querySelector('#ld-instalar'); if (bi) bi.onclick = () => { fechar(); abrirCompanionAjuda(); }; return;
       }
       const discos = agruparDiscos(r.volumes || []);
       if (!discos.length) {
@@ -1848,6 +1885,8 @@
   // ---------- navegação ----------
   function go(view) { state.view = view; render(); }
   function render() {
+    const barra = document.getElementById('ldBar');
+    if (barra) barra.style.display = state.authed && state.view !== 'entrar' ? '' : 'none';
     document.querySelectorAll('.navbtn').forEach(t =>
       t.classList.toggle('active', t.dataset.view === state.view || (state.view === 'detalhe' && t.dataset.view === 'busca') || ((state.view === 'versoes' || state.view === 'relatorio') && t.dataset.view === 'dashboard')));
     if (state.view === 'sobre') return renderSobre();
@@ -1870,6 +1909,7 @@
   document.getElementById('btnSobre').addEventListener('click', () => go('sobre'));
   document.getElementById('btnRelatorio').addEventListener('click', () => { if (!state.authed) return go('entrar'); go('relatorio'); });
   document.getElementById('btnLerDrive').addEventListener('click', () => { if (!state.authed) return go('entrar'); lerDrive(); });
+  document.getElementById('btnCompanionAjuda').addEventListener('click', abrirCompanionAjuda);
   document.getElementById('btnAtualizar').addEventListener('click', async () => {
     const b = document.getElementById('btnAtualizar');
     b.classList.add('spin');

@@ -18,6 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # O companion (companion/) é a fonte única; aqui só é copiado para dentro do site publicado,
+      # para o app oferecer o instalador em .../OmniDrive/companion/instalar-companion.bat
+      - name: Incluir o companion no site
+        run: |
+          mkdir -p app/companion
+          cp companion/omnidrive-smart.py companion/iniciar-smart.bat companion/instalar-companion.bat companion/LEIAME.txt app/companion/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app

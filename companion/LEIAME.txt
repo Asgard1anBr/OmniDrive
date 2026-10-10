@@ -14,6 +14,24 @@ informações do dispositivo" dentro do OmniDrive não funciona
 (aparece a mensagem "Companion não detectado").
 
 
+COMPUTADOR NOVO? USE O INSTALADOR (jeito mais fácil)
+--------------------------------------------------------
+1. No OmniDrive, toque em "Primeira vez neste computador? Instalar o
+   companion" (logo abaixo do botão "Ler drive") e baixe o instalador.
+   Ou baixe direto:
+   https://asgard1anbr.github.io/OmniDrive/companion/instalar-companion.bat
+2. Abra o arquivo e aceite o pedido de administrador. Ele instala o que
+   faltar (Python e smartmontools), baixa o companion para
+   %LOCALAPPDATA%\OmniDrive\companion e cria o atalho "OmniDrive
+   Companion" na Área de Trabalho.
+3. Para usar: abra o atalho e deixe a janela preta aberta.
+4. Para ATUALIZAR o companion no futuro: rode o instalador de novo.
+O Windows/navegador pode avisar por ser um arquivo .bat: escolha
+"Manter" / "Executar mesmo assim". Só funciona em Windows.
+
+Se preferir instalar à mão, siga as seções abaixo.
+
+
 LINKS DE DOWNLOAD (copie e cole no navegador)
 --------------------------------------------------------
 PYTHON (Windows 64-bit) — instalador direto:

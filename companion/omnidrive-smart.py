@@ -34,7 +34,7 @@ except Exception:
     pass
 
 PORT = int(os.environ.get('OMNIDRIVE_PORT', 7777))
-COMPANION_VERSION = '1.5.1'
+COMPANION_VERSION = '1.6'
 
 import threading
 import shutil

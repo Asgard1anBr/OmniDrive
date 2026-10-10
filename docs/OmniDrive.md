@@ -318,6 +318,13 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
 - **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
   `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
   `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v2.9.0** (2026-10-09) — **instalação do companion para máquinas novas**, sem depender da pasta do projeto.
+  O deploy (`deploy.yml`) copia `companion/*` para `app/companion/` antes de publicar; o app oferece
+  `.../OmniDrive/companion/instalar-companion.bat` num guia (botão "Primeira vez neste computador?") que explica
+  **por que** o companion existe (navegador não enxerga hardware; roda só local; nada vai à internet). O instalador
+  usa `winget` (`Python.Python.3.12`, `smartmontools.smartmontools`), baixa os arquivos para
+  `%LOCALAPPDATA%\OmniDrive\companion` e cria atalho; rodar de novo atualiza. Botão "Ler drive" virou o destaque
+  (primário, centralizado abaixo do menu). Testado com `OMNI_TEST=1` contra servidor local (sucesso e falha de download).
 - **v2.8.0** (2026-10-09) — **Ler drive** (botão no nav). O companion (v1.5) expõe `/volumes` e `/scan`; o app
   agrupa volumes por disco físico, **identifica** se é drive conhecido ou novo e, se conhecido, mostra o diff
   (pastas/arquivos novos e removidos, uso) antes de aplicar. Identificação por sinais combinados — serial do
