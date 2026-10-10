@@ -16,8 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.10.0';
+  const VERSAO = '2.11.0';
   const CHANGELOG = [
+    { v: '2.11.0', data: '2026-10-09', itens: [
+      'Ler drive: botão "Vincular a drive existente" em todos os cartões (novo, conhecido e bloqueado).',
+      'Vincular grava só a identidade do disco no drive escolhido, sem ler o conteúdo — funciona até com o BitLocker bloqueado. Opção "Vincular e atualizar conteúdo" quando o drive está liberado.',
+      'Aviso quando o serial cadastrado no drive escolhido é diferente do serial do disco plugado.'
+    ]},
     { v: '2.10.0', data: '2026-10-09', itens: [
       'Ler drive: reconhece o drive pelo serial REAL do HD (lido por dentro da caixa USB via S.M.A.R.T.), mesmo que o nome do volume seja diferente da etiqueta do catálogo.',
       'Drive que não foi reconhecido agora mostra o modelo e o S/N do HD e oferece "É um drive que já tenho": você escolhe qual é uma vez, e nas próximas leituras ele é reconhecido sozinho.',
@@ -195,7 +200,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.10.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.11.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -1584,15 +1589,15 @@
         if (id) { titulo = esc(id.drive.nome); nota = `<div class="ld-sub">Identificado por: ${esc(id.motivo)}${id.nivel === 'provavel' ? ' — confirme se é este mesmo' : ''}</div>`; }
         if (g.locked) {
           badge = '<span class="ld-badge ld-lock">🔒 Bloqueado</span>';
-          nota += `<div class="ld-sub">Drive protegido pelo BitLocker. Desbloqueie no Windows (Explorer → clique no drive → senha) e toque em <b>Ler de novo</b>.</div>`;
-          acoes = '';
+          nota += `<div class="ld-sub">Drive protegido pelo BitLocker. Para ler o conteúdo, desbloqueie no Windows (Explorer → clique no drive → senha) e toque em <b>Ler de novo</b>. Você já pode vincular o disco a um drive do catálogo sem desbloquear.</div>`;
+          acoes = `<button class="btn ghost" data-i="${i}" data-act="escolher">Vincular a drive existente</button>`;
         } else if (id) {
           badge = `<span class="ld-badge ${id.nivel === 'exato' ? 'ld-known' : 'ld-maybe'}">${id.nivel === 'exato' ? 'Conhecido' : 'Provável'}</span>`;
-          acoes = `<button class="btn" data-i="${i}" data-act="atualizar">Atualizar conteúdo</button><button class="btn ghost" data-i="${i}" data-act="novo">É outro drive</button>`;
+          acoes = `<button class="btn" data-i="${i}" data-act="atualizar">Atualizar conteúdo</button><button class="btn ghost" data-i="${i}" data-act="escolher">Vincular a outro drive</button><button class="btn ghost" data-i="${i}" data-act="novo">É um drive novo</button>`;
         } else {
           badge = '<span class="ld-badge ld-new">Novo</span>';
-          nota = '<div class="ld-sub">Não encontrei este drive no catálogo. Se você já o cadastrou antes, escolha qual é — da próxima vez ele será reconhecido sozinho.</div>';
-          acoes = `<button class="btn" data-i="${i}" data-act="escolher">É um drive que já tenho</button><button class="btn ghost" data-i="${i}" data-act="novo">Cadastrar como novo</button>`;
+          nota = '<div class="ld-sub">Não encontrei este drive no catálogo. Se você já o cadastrou antes, vincule-o ao drive existente — da próxima vez ele será reconhecido sozinho.</div>';
+          acoes = `<button class="btn" data-i="${i}" data-act="escolher">Vincular a drive existente</button><button class="btn ghost" data-i="${i}" data-act="novo">Cadastrar como novo</button>`;
         }
         return `<div class="ld-card"><div class="ld-head"><span class="ld-name">${DRIVE_ICON[id ? id.drive.tipo : ''] || '💽'} ${titulo}</span>${badge}</div>
           <div class="ld-sub">${esc(info)}</div>${nota}${acoes ? `<div class="ld-actions">${acoes}</div>` : ''}</div>`;
@@ -1618,8 +1623,37 @@
       });
       body.querySelectorAll('.ld-opt').forEach(b => b.addEventListener('click', () => {
         const drive = store.load().drives.find(x => x.id === b.dataset.id);
-        if (drive) agir({ g, id: { drive, nivel: 'manual', motivo: 'escolhido por você' } }, 'atualizar');
+        if (drive) confirmarVinculo(g, drive);
       }));
+    }
+
+    // Vincular = gravar a identidade do disco no drive escolhido, sem precisar ler o conteúdo
+    // (por isso funciona também com o BitLocker bloqueado).
+    function confirmarVinculo(g, drive) {
+      const ss = g.smart && g.smart.serial;
+      const serialCad = serialUtil(drive.serial || (drive.smart && drive.smart.serial));
+      const conflito = !!(serialCad && serialUtil(ss) && serialCad !== serialUtil(ss));
+      const jaVinculado = !conflito && drive.ident && (drive.ident.smartSerial || drive.ident.diskSerial || (drive.ident.volSerials || []).length);
+      const disco = [g.nome, fmtGB(g.diskSize / 1e9), g.smart && g.smart.model, ss ? 'S/N ' + ss : null].filter(Boolean).join(' · ');
+      setBody(`<p>Vincular <b>${esc(drive.nome)}</b> a este disco?</p>
+        <div class="ld-sub">${esc(disco)}</div>
+        ${conflito ? `<div class="ld-warn">⚠️ O serial cadastrado neste drive (${esc(drive.serial || drive.smart.serial)}) é diferente do serial deste disco (${esc(ss)}). Pode não ser o mesmo drive.</div>` : ''}
+        ${jaVinculado ? '<div class="ld-sub">Este drive já estava vinculado a um disco; o vínculo anterior será substituído.</div>' : ''}
+        <div class="ld-sub">Depois de vinculado, ele é reconhecido sozinho nas próximas leituras.</div>
+        <div class="form-actions"><button class="btn ghost" id="ld-voltar">Voltar</button>
+          <button class="btn ${g.locked ? '' : 'ghost'}" id="ld-so">${g.locked ? 'Vincular' : 'Só vincular'}</button>
+          ${g.locked ? '' : '<button class="btn" id="ld-vatu">Vincular e atualizar conteúdo</button>'}</div>`);
+      body.querySelector('#ld-voltar').onclick = () => escolher({ g });
+      body.querySelector('#ld-so').onclick = () => {
+        const cat2 = store.load(), alvo = cat2.drives.find(x => x.id === drive.id);
+        if (!alvo) { toast('Drive não encontrado no catálogo.'); return; }
+        alvo.ident = mergeIdent({}, g); alvo.atualizadoEm = new Date().toISOString(); // vínculo explícito: não herda identidade de outro disco
+        const sd = smartDoDisco(g);
+        if (sd) { alvo.smart = sd; if (!alvo.serial) alvo.serial = sd.serial || null; if (!alvo.modelo) alvo.modelo = sd.model || null; }
+        store.save(cat2); toast('Drive vinculado'); listar();
+      };
+      const vatu = body.querySelector('#ld-vatu');
+      if (vatu) vatu.onclick = () => agir({ g, id: { drive, nivel: 'manual', motivo: 'escolhido por você' } }, 'atualizar');
     }
 
     async function agir({ g, id }, act) {
@@ -1665,7 +1699,7 @@
         if (!alvo) { toast('Drive não encontrado no catálogo.'); return; }
         alvo.conteudo = lido.tree; alvo.usadoGB = lido.usedGB;
         if (!alvo.capacidadeGB) alvo.capacidadeGB = Math.round(g.diskSize / 1e9);
-        alvo.ident = mergeIdent(alvo.ident, g); alvo.atualizadoEm = new Date().toISOString();
+        alvo.ident = mergeIdent(id.nivel === 'manual' ? {} : alvo.ident, g); alvo.atualizadoEm = new Date().toISOString();
         const sd = smartDoDisco(g);
         if (sd) { alvo.smart = sd; if (!alvo.serial) alvo.serial = sd.serial || null; if (!alvo.modelo) alvo.modelo = sd.model || null; }
         store.save(cat2); state.driveId = alvo.id; toast('Drive atualizado'); fechar(); go('detalhe');
