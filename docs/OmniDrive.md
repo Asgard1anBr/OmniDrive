@@ -318,6 +318,16 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
 - **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
   `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
   `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v2.13.0** (2026-11-12) — **detecção automática** no botão "Ler drive": `/volumes` a cada 5 s (aba visível),
+  `/smart` só quando a assinatura dos volumes muda; recuo para ~30 s com o companion fechado; liga só depois do
+  primeiro uso bem-sucedido do companion no navegador (`localStorage omnidrive:companion-ok`), para não disparar a
+  permissão de rede local nem tentar à toa. **Semgrep 1.183 + Gitleaks 8.30 instalados e rodados**: Gitleaks sem
+  segredos (histórico completo dos dois repositórios + arquivos atuais); Semgrep achou **poluição de protótipo real**
+  no fallback de leitura de pastas (pasta `__proto__` poluía `Object.prototype`; `constructor`/`__files` derrubavam
+  a leitura) — trocado por `Map`; mesmo padrão em `porLocal`/`grupos` (nome de local) → objeto sem protótipo. Regressão
+  em `verificar.py`. Demais apontamentos triados: `sg-02` (17, todos via `esc()`, cobertos por teste), SRI no script do
+  Google (não versionado, inviável), path traversal no dev-server (falso positivo; checagem endurecida mesmo assim),
+  `urllib` dinâmico e servidor http em ferramentas locais (falsos positivos).
 - **v2.12.2** (2026-11-12) — **lote 3 (qualidade)**: `tools/verificar.py` (sintaxe, CSP, regressão de XSS, Host do
   companion, instalador ok/adulterado, pontos de versão, CRLF), sem dependências; também é job `verificar` no CI, com o
   deploy dependente dele. Provado: reintroduzir o XSS faz o script falhar. `CLAUDE.md` reescrito (estava em v1.0) e

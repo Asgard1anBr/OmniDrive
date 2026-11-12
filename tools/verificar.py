@@ -56,6 +56,15 @@ def t_xss_painel():
     if not m or "String(s ?? '')" not in m.group(1) or "&#39;" not in m.group(1): falha('esc() robusto', 'precisa String(s ?? \'\') e escapar \'')
     else: ok('esc() robusto')
 
+# 3b) Nomes vindos de drives/usuário nunca viram chave de objeto comum ('__proto__', 'constructor'…)
+def t_prototipo():
+    js = ler(os.path.join(APP, 'js', 'app.js'))
+    ruins = []
+    if re.search(r"node\[nome\]\s*=", js): ruins.append('árvore de pastas indexada por objeto')
+    for v in ('porLocal', 'grupos'):
+        if re.search(rf"const {v} = \{{\}};", js): ruins.append(v + ' = {}')
+    falha('nomes como chave de objeto', ruins) if ruins else ok('nomes de pasta/local não poluem o protótipo')
+
 # 4) Companion recusa Host estranho (DNS rebinding) e aceita o local
 def porta_livre():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
@@ -127,7 +136,7 @@ def t_crlf():
         (ok if lf == 0 else lambda n: falha(n, f'{lf} linha(s) com LF puro'))(f'CRLF {a}')
 
 if __name__ == '__main__':
-    for nome, fn in [('Sintaxe', t_sintaxe), ('CSP', t_csp), ('XSS', t_xss_painel), ('Companion', t_companion),
+    for nome, fn in [('Sintaxe', t_sintaxe), ('CSP', t_csp), ('XSS', t_xss_painel), ('Protótipo', t_prototipo), ('Companion', t_companion),
                      ('Instalador', t_instalador), ('Versão', t_versao), ('CRLF', t_crlf)]:
         print(f'[{nome}]')
         try: fn()

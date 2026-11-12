@@ -73,9 +73,10 @@ Tem saúde S.M.A.R.T., "Ler drive" (identifica o drive plugado) e relatório em 
 - Paleta: fundo `#081019`/`#0b1a26`, ciano `#2ee6e0`, azul `#3a7bd5`. Detalhes no §7 do documento-mestre.
 
 ## Contexto atual (2026-11-12)
-- **App v2.12.2 · companion v1.8.** Revisão de segurança feita (relatório no `OmniDrive-interno`); lotes 1–3
+- **App v2.13.0 · companion v1.8.** Detecção automática de drive plugado no botão "Ler drive" (v2.13.0). Revisão de segurança feita (relatório no `OmniDrive-interno`); lotes 1–3
   concluídos: XSS do Painel corrigido, CSP, Host validado, companion em ProgramFiles com SHA256SUMS, `.bat` em CRLF,
   actions por SHA, `tools/verificar.py` + barreira no CI, este arquivo e `SECURITY.md`.
 - **Pendências (não verificadas):** login completo no Brave com a CSP; winget `--scope machine` numa máquina limpa;
-  teste automatizado de XSS no navegador (hoje é checagem estática + teste manual); Semgrep/Gitleaks (não
-  instalados); acessibilidade (teclado/axe); 390 px das telas novas; detecção automática ao plugar drive.
+  teste automatizado de XSS no navegador (hoje é checagem estática + teste manual); acessibilidade (teclado/axe);
+  390 px das telas novas; apagar a pasta antiga `%LOCALAPPDATA%\OmniDrive\companion` **só depois** de reinstalar.
+- **Ferramentas:** Semgrep (`%APPDATA%\Python\Python314\Scripts` precisa estar no PATH) e Gitleaks (winget) instalados.

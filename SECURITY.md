@@ -52,5 +52,5 @@ Multi-tenant: não (um usuário). Checagens automáticas: `python tools/verifica
 - [ ] Login completo com a CSP no Brave.
 - [ ] Instalação limpa: winget `--scope machine` do Python.
 - [ ] Teste automatizado de XSS no navegador (hoje: checagem estática + reprodução manual).
-- [ ] Gitleaks e Semgrep (não instalados; busca manual de segredos feita em 2026-11).
+- [x] Gitleaks (histórico completo, sem segredos) e Semgrep (achado de poluição de protótipo corrigido em v2.13.0) — 2026-11.
 - [ ] Acessibilidade (teclado, leitor de tela, axe).

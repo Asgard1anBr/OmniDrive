@@ -449,3 +449,8 @@ select.field option{background:#0b1a26;color:#fff;}
   .rep-doc{box-shadow:none !important;max-width:none !important;width:auto !important;padding:0 !important;border-radius:0;}
   .rep-h2{page-break-after:avoid;}
 }
+
+/* Ler drive: destaque quando a detecção automática encontra um drive plugado */
+.ld-main.ld-alerta{animation:ldPulse 2.2s ease-in-out infinite;}
+@keyframes ldPulse{0%,100%{box-shadow:0 0 20px rgba(46,230,224,.25);}50%{box-shadow:0 0 34px rgba(46,230,224,.7);}}
+@media (prefers-reduced-motion:reduce){.ld-main.ld-alerta{animation:none;outline:2px solid var(--cyan);}}

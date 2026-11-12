@@ -16,8 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.12.2';
+  const VERSAO = '2.13.0';
   const CHANGELOG = [
+    { v: '2.13.0', data: '2026-11-12', itens: [
+      'Detecção automática: com o companion aberto, o botão "Ler drive" mostra o que está plugado — "Atualizar leitura: <drive>", "Drive novo plugado", "bloqueado" ou "2 drives plugados" — e avisa quando um drive é conectado.',
+      'A detecção só liga depois que o companion foi usado uma vez neste navegador (nada de pedidos em PCs sem companion ou no celular).',
+      'Corrigido: pastas com nomes como "__proto__" ou "constructor" quebravam a leitura de pastas (e poderiam bagunçar o app); o mesmo para nomes de local.'
+    ]},
     { v: '2.12.2', data: '2026-11-12', itens: [
       'Bastidores: verificação automática antes de cada publicação (se algo de segurança quebrar, a versão não vai ao ar).',
       'Documentação do projeto e do modelo de segurança atualizadas.'
@@ -221,7 +226,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.12.2', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.13.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -586,7 +591,7 @@
     const tipsHtml = tips.map(t => `<div class="dash-tip">${t}</div>`).join('');
 
     // drives por local
-    const porLocal = {};
+    const porLocal = Object.create(null); // chaves = nomes de local digitados (podem ser 'constructor' etc.)
     drives.forEach(d => { const loc = d.local || 'Sem local'; if (!porLocal[loc]) porLocal[loc] = 0; porLocal[loc]++; });
     const locaisHtml = Object.entries(porLocal).sort((a, b) => b[1] - a[1]).map(([loc, n]) =>
       `<div class="dash-bar-row">
@@ -685,7 +690,7 @@
 
     let resultsHtml;
     if (state.agrupar) {
-      const grupos = {};
+      const grupos = Object.create(null);
       res.forEach(d => { const loc = d.local || 'Sem local'; if (!grupos[loc]) grupos[loc] = []; grupos[loc].push(d); });
       const sorted = Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0]));
       resultsHtml = sorted.map(([loc, drives]) =>
@@ -1242,7 +1247,9 @@
       scanSt.style.color = 'var(--txt-mid)';
       try {
       let nomeRaiz = '';
-      const arvore = { __files: [] };
+      // Map (e não propriedades de objeto): nomes de pasta vêm do drive e podem ser '__proto__', 'constructor'…
+      const novoNo = () => ({ pastas: new Map(), arquivos: [] });
+      const arvore = novoNo();
       for (const f of files) {
         const partes = f.webkitRelativePath.split('/');
         if (!nomeRaiz) nomeRaiz = partes[0];
@@ -1253,19 +1260,19 @@
         for (let i = 1; i < partes.length - 1; i++) {
           const nome = partes[i];
           if (nome.startsWith('.') || nome.startsWith('$') || nome === 'System Volume Information') { cortado = true; break; }
-          if (!node[nome]) node[nome] = { __files: [] };
-          node = node[nome];
+          if (!node.pastas.has(nome)) node.pastas.set(nome, novoNo());
+          node = node.pastas.get(nome);
         }
-        if (!cortado) node.__files.push(arquivo);
+        if (!cortado) node.arquivos.push(arquivo);
       }
       function serializarArvore(obj, prof) {
         const linhas = [];
-        const nomes = Object.keys(obj).filter(k => k !== '__files').sort((a, b) => a.localeCompare(b));
+        const nomes = [...obj.pastas.keys()].sort((a, b) => a.localeCompare(b));
         for (const nome of nomes) {
           linhas.push('›'.repeat(prof) + ' ' + nome);
-          if (prof < 3) linhas.push(...serializarArvore(obj[nome], prof + 1));
+          if (prof < 3) linhas.push(...serializarArvore(obj.pastas.get(nome), prof + 1));
         }
-        for (const arquivo of (obj.__files || []).sort((a, b) => a.localeCompare(b))) {
+        for (const arquivo of obj.arquivos.sort((a, b) => a.localeCompare(b))) {
           linhas.push('›'.repeat(prof) + ' •' + arquivo);
         }
         return linhas;
@@ -1437,9 +1444,72 @@
   }
 
   // ================= LER DRIVE (identifica drive plugado: conhecido ou novo) =================
+  const CHAVE_COMPANION_OK = 'omnidrive:companion-ok';
   async function companionGet(path, ms) {
     const r = await fetch(SMART_URL + path, { signal: AbortSignal.timeout(ms || 15000) });
-    return r.json(); // 404/423 também trazem JSON com {ok:false,error}
+    const j = await r.json(); // 404/423 também trazem JSON com {ok:false,error}
+    // marca que este navegador já usou o companion: só então a detecção automática liga (evita pedir
+    // permissão de rede local / tentar à toa em PCs sem companion e no celular)
+    try { if (!localStorage.getItem(CHAVE_COMPANION_OK)) { localStorage.setItem(CHAVE_COMPANION_OK, '1'); iniciarAutoLeitura(); } } catch (e) {}
+    return j;
+  }
+
+  // ---------- Detecção automática: com o companion aberto, o botão "Ler drive" acompanha o que está plugado ----------
+  const AUTO = { timer: null, assinatura: null, discos: [], smart: [], ocupado: false, vistos: new Set(), falhas: 0, pular: 0 };
+  function textoBotaoLer(estado) {
+    const b = document.getElementById('btnLerDrive'); if (!b) return;
+    b.classList.toggle('ld-alerta', !!estado);
+    b.textContent = estado || '💽 Ler drive';
+  }
+  function atualizarBotaoLer() {
+    const discos = AUTO.discos;
+    if (!discos.length) return textoBotaoLer(null);
+    const cat = store.load();
+    const ids = discos.map(g => ({ g, id: identificarDisco(g, cat) }));
+    if (ids.length > 1) return textoBotaoLer(`💽 ${ids.length} drives plugados — ler`);
+    const { g, id } = ids[0];
+    const nome = id ? id.drive.nome : g.nome;
+    if (g.locked) return textoBotaoLer(`🔒 ${nome}: desbloqueie para ler`);
+    textoBotaoLer(id ? `💽 Atualizar leitura: ${nome}` : `💽 Drive novo plugado (${nome}) — ler`);
+  }
+  async function tickAutoLeitura() {
+    if (AUTO.ocupado || document.hidden || !state.authed || mode === null) return;
+    if (AUTO.pular > 0) { AUTO.pular--; return; }   // companion fechado: tenta de novo a cada ~30 s, não a cada 5 s
+    AUTO.ocupado = true;
+    try {
+      const r = await fetch(SMART_URL + '/volumes', { signal: AbortSignal.timeout(20000) }).then(x => x.json());
+      AUTO.falhas = 0;
+      if (!r || !r.ok) { AUTO.discos = []; AUTO.assinatura = null; return textoBotaoLer(null); }
+      const discos = agruparDiscos(r.volumes || []);
+      const assin = discos.map(g => g.vols.map(v => v.letter + (v.locked ? 'L' : '') + v.volSerial).join(',')).sort().join('|');
+      if (assin !== AUTO.assinatura) {   // algo foi plugado/removido/desbloqueado: aí sim busca o S.M.A.R.T. (serial real)
+        AUTO.assinatura = assin;
+        const sm = await fetch(SMART_URL + '/smart', { signal: AbortSignal.timeout(40000) }).then(x => x.json()).catch(() => null);
+        AUTO.smart = (sm && sm.ok && Array.isArray(sm.drives)) ? sm.drives : [];
+        const cat = store.load();
+        for (const g of discos) {
+          g.smart = AUTO.smart.find(s => (s.letters || []).some(l => g.vols.some(v => v.letter.toUpperCase() === String(l).toUpperCase()))) || null;
+          const chave = g.vols.map(v => v.letter + v.volSerial).join(',');
+          if (!AUTO.vistos.has(chave)) {
+            AUTO.vistos.add(chave);
+            if (AUTO.discos.length || AUTO.primeiraJaFeita) { const id = identificarDisco(g, cat); toast(id ? `${id.drive.nome} plugado` : 'Drive novo plugado'); }
+          }
+        }
+        AUTO.primeiraJaFeita = true;
+        AUTO.discos = discos;
+      }
+      atualizarBotaoLer();
+    } catch (e) {
+      AUTO.discos = []; AUTO.assinatura = null; textoBotaoLer(null); // companion fechado: botão volta ao normal
+      AUTO.falhas++; AUTO.pular = 5;
+    } finally { AUTO.ocupado = false; }
+  }
+  function iniciarAutoLeitura() {
+    let ligado = false; try { ligado = !!localStorage.getItem(CHAVE_COMPANION_OK); } catch (e) {}
+    if (!ligado || AUTO.timer) return;
+    AUTO.timer = setInterval(tickAutoLeitura, 5000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { AUTO.pular = 0; tickAutoLeitura(); } });
+    tickAutoLeitura();
   }
   // Várias caixas USB reportam serial falso (ex.: 0123456789ABCDEF) — não serve para identificar.
   function serialUtil(s) {
@@ -1598,7 +1668,7 @@
     const m = modal('<h3>💽 Ler drive</h3><div id="ld-body"></div>');
     const body = m.querySelector('#ld-body');
     const setBody = h => { body.innerHTML = h; };
-    const fechar = () => m.remove();
+    const fechar = () => { m.remove(); atualizarBotaoLer(); };
 
     async function listar() {
       setBody('<p class="muted">Lendo os drives conectados… <br><small>A primeira leitura pode levar alguns segundos.</small></p>');
@@ -2070,4 +2140,5 @@
 
   state.view = 'entrar';
   render();
+  iniciarAutoLeitura();
 })();

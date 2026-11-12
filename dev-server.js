@@ -17,7 +17,8 @@ http.createServer((req, res) => {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/') urlPath = '/index.html';
   const filePath = path.join(ROOT, path.normalize(urlPath));
-  if (!filePath.startsWith(ROOT)) { res.writeHead(403); return res.end('Forbidden'); }
+  // ROOT + separador: só startsWith(ROOT) aceitaria uma pasta irmã como 'app-qualquer'
+  if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) { res.writeHead(403); return res.end('Forbidden'); }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found: ' + urlPath); }
     res.writeHead(200, {
