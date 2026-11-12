@@ -6,19 +6,27 @@ cd /d "%~dp0"
 :: ---------------------------------------------------------------------------
 :: Instalador do OmniDrive Companion (Windows).
 :: Instala o que faltar (Python e smartmontools) via winget, baixa o companion
-:: do proprio site do OmniDrive e cria um atalho na Area de Trabalho.
-:: Pode ser rodado de novo a qualquer momento para ATUALIZAR o companion.
+:: do proprio site do OmniDrive, confere os arquivos e cria um atalho na Area
+:: de Trabalho. Pode ser rodado de novo a qualquer momento para ATUALIZAR.
+::
+:: Seguranca: o companion roda como ADMINISTRADOR. Por isso ele e instalado em
+:: %ProgramFiles% (so administrador grava) e usa Python instalado para todos os
+:: usuarios: arquivo numa pasta gravavel pelo usuario poderia ser trocado por
+:: outro programa e ganhar administrador. Os arquivos baixados sao conferidos
+:: contra o SHA256SUMS publicado junto (pega download corrompido ou versoes
+:: misturadas; nao protege contra o proprio site ser comprometido).
 ::
 :: Variaveis opcionais (usadas em testes):
 ::   OMNI_BASE_URL    de onde baixar (padrao: o site do OmniDrive)
-::   OMNI_INSTALL_DIR onde instalar  (padrao: %LOCALAPPDATA%\OmniDrive\companion)
+::   OMNI_INSTALL_DIR onde instalar  (padrao: %ProgramFiles%\OmniDrive\companion)
 ::   OMNI_TEST=1      nao pede admin, nao instala nada, nao cria atalho
 :: ---------------------------------------------------------------------------
 
 set "BASE=%OMNI_BASE_URL%"
 if not defined BASE set "BASE=https://asgard1anbr.github.io/OmniDrive/companion"
 set "DEST=%OMNI_INSTALL_DIR%"
-if not defined DEST set "DEST=%LOCALAPPDATA%\OmniDrive\companion"
+if not defined DEST set "DEST=%ProgramFiles%\OmniDrive\companion"
+set "STAGE=%TEMP%\omnidrive-companion-%RANDOM%%RANDOM%"
 
 if not defined OMNI_TEST call :elevate
 if "%NEEDS_EXIT%"=="1" exit /b
@@ -34,10 +42,14 @@ echo identificar drives plugados. Nada vai para a internet.
 echo.
 
 :: ---------- 1. Python ----------
-echo [1/4] Verificando Python...
+echo [1/4] Verificando Python (instalado para todos os usuarios)...
 call :findpy
-if not defined PYEXE call :winget_install Python.Python.3.12 Python
+if not defined PYEXE call :winget_install Python.Python.3.12 Python machine
 if not defined PYEXE call :findpy
+if not defined PYEXE if defined OMNI_TEST (
+    echo [TESTE] sem Python para todos os usuarios - seguindo para testar o resto.
+    set "PYEXE=(teste)"
+)
 if not defined PYEXE goto :nopython
 echo [OK] Python: !PYEXE!
 
@@ -55,15 +67,26 @@ goto :download
 :smartok
 echo [OK] smartmontools encontrado.
 
-:: ---------- 3. Download ----------
+:: ---------- 3. Download + conferencia ----------
 :download
 echo.
-echo [3/4] Baixando o companion para: %DEST%
+echo [3/4] Baixando e conferindo o companion...
+mkdir "%STAGE%" >nul 2>&1
+set "FAIL="
+for %%F in (SHA256SUMS omnidrive-smart.py iniciar-smart.bat LEIAME.txt) do call :baixar %%F
+if defined FAIL goto :falhadownload
+call :conferir
+if defined FAIL goto :falhahash
+echo [OK] Arquivos conferidos (SHA-256).
 if not exist "%DEST%" mkdir "%DEST%"
 set "FAIL="
-for %%F in (omnidrive-smart.py iniciar-smart.bat LEIAME.txt) do call :baixar %%F
-if defined FAIL goto :falhadownload
-echo [OK] Arquivos baixados.
+for %%F in (omnidrive-smart.py iniciar-smart.bat LEIAME.txt) do (
+    copy /y "%STAGE%\%%F" "%DEST%\%%F" >nul
+    if errorlevel 1 set "FAIL=1"
+)
+rmdir /s /q "%STAGE%" >nul 2>&1
+if defined FAIL goto :falhacopia
+echo [OK] Instalado em: %DEST%
 
 :: ---------- 4. Atalho ----------
 echo.
@@ -71,6 +94,12 @@ echo [4/4] Criando atalho na Area de Trabalho...
 if defined OMNI_TEST goto :fim
 powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut($d+'\OmniDrive Companion.lnk'); $s.TargetPath='%DEST%\iniciar-smart.bat'; $s.WorkingDirectory='%DEST%'; $s.IconLocation='shell32.dll,12'; $s.Description='Inicia o companion do OmniDrive'; $s.Save()"
 if errorlevel 1 (echo [AVISO] Nao consegui criar o atalho. Use: %DEST%\iniciar-smart.bat) else echo [OK] Atalho "OmniDrive Companion" criado.
+if exist "%LOCALAPPDATA%\OmniDrive\companion\omnidrive-smart.py" (
+    echo.
+    echo [INFO] Havia uma instalacao antiga em %LOCALAPPDATA%\OmniDrive\companion.
+    echo        Ela nao e mais usada; o atalho agora aponta para %DEST%.
+    echo        Pode apagar aquela pasta quando quiser.
+)
 
 :fim
 echo.
@@ -93,17 +122,36 @@ exit /b
 
 :nopython
 echo.
-echo [ERRO] Nao consegui instalar o Python automaticamente.
+echo [ERRO] Nao consegui instalar o Python para todos os usuarios.
 echo Instale manualmente em https://www.python.org/downloads/windows/
-echo marcando "Add python.exe to PATH", e rode este instalador de novo.
+echo marcando "Install for all users" e "Add python.exe to PATH",
+echo e rode este instalador de novo.
 echo.
 pause
 exit /b 1
 
 :falhadownload
+rmdir /s /q "%STAGE%" >nul 2>&1
 echo.
 echo [ERRO] Nao consegui baixar o companion. Confira a internet e tente de novo.
 echo Origem: %BASE%
+echo.
+pause
+exit /b 1
+
+:falhahash
+rmdir /s /q "%STAGE%" >nul 2>&1
+echo.
+echo [ERRO] Os arquivos baixados NAO conferem com o SHA256SUMS publicado.
+echo Nada foi instalado. Tente de novo em alguns minutos (pode ser uma
+echo publicacao em andamento). Se persistir, nao use estes arquivos.
+echo.
+pause
+exit /b 1
+
+:falhacopia
+echo.
+echo [ERRO] Nao consegui copiar para %DEST% (precisa de administrador).
 echo.
 pause
 exit /b 1
@@ -118,15 +166,9 @@ set "NEEDS_EXIT=1"
 goto :eof
 
 :findpy
+:: So aceita Python instalado para TODOS os usuarios (pasta protegida).
 set "PYEXE="
-for /f "delims=" %%p in ('py -3 -c "import sys;print(sys.executable)" 2^>nul') do set "PYEXE=%%p"
-if not defined PYEXE for /f "delims=" %%p in ('python -c "import sys;print(sys.executable)" 2^>nul') do set "PYEXE=%%p"
-if not defined PYEXE if exist "%LOCALAPPDATA%\Python" for /f "delims=" %%p in ('dir /b /s "%LOCALAPPDATA%\Python\pythoncore-*\python.exe" 2^>nul') do set "PYEXE=%%p"
-if not defined PYEXE if exist "%LOCALAPPDATA%\Programs\Python" for /f "delims=" %%p in ('dir /b /s "%LOCALAPPDATA%\Programs\Python\python.exe" 2^>nul') do set "PYEXE=%%p"
-if not defined PYEXE if exist "%ProgramFiles%\Python314\python.exe" set "PYEXE=%ProgramFiles%\Python314\python.exe"
-if not defined PYEXE if exist "%ProgramFiles%\Python313\python.exe" set "PYEXE=%ProgramFiles%\Python313\python.exe"
-if not defined PYEXE if exist "%ProgramFiles%\Python312\python.exe" set "PYEXE=%ProgramFiles%\Python312\python.exe"
-if not defined PYEXE if exist "%ProgramFiles%\Python311\python.exe" set "PYEXE=%ProgramFiles%\Python311\python.exe"
+for /d %%d in ("%ProgramFiles%\Python3*") do if exist "%%d\python.exe" set "PYEXE=%%d\python.exe"
 goto :eof
 
 :hassmart
@@ -147,16 +189,25 @@ if errorlevel 1 (
     echo [AVISO] winget nao encontrado - instale %~2 manualmente.
     goto :eof
 )
+set "SCOPE="
+if /i "%~3"=="machine" set "SCOPE=--scope machine"
 echo Instalando %~2 com o winget, aguarde ^(pode demorar^)...
-winget install -e --id %~1 --accept-package-agreements --accept-source-agreements --silent
+winget install -e --id %~1 %SCOPE% --accept-package-agreements --accept-source-agreements --silent
 goto :eof
 
 :baixar
-powershell -NoProfile -Command "try { [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri '%BASE%/%~1' -OutFile '%DEST%\%~1' -ErrorAction Stop } catch { exit 1 }"
+powershell -NoProfile -Command "try { [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri '%BASE%/%~1' -OutFile '%STAGE%\%~1' -ErrorAction Stop } catch { exit 1 }"
 if errorlevel 1 (
     echo [ERRO] Falha ao baixar %~1
     set "FAIL=1"
     goto :eof
 )
 echo        baixado: %~1
+goto :eof
+
+:conferir
+:: Cada arquivo instalado precisa ter hash publicado e o hash precisa bater.
+set "FAIL="
+powershell -NoProfile -Command "$s='%STAGE%'; $sums=@{}; foreach($l in Get-Content -LiteralPath (Join-Path $s 'SHA256SUMS')){ if($l -match '^([0-9a-fA-F]{64})\s+\*?(\S+)\s*$'){ $sums[$matches[2]]=$matches[1].ToUpper() } }; $ok=$true; foreach($n in 'omnidrive-smart.py','iniciar-smart.bat','LEIAME.txt'){ $f=Join-Path $s $n; if(-not $sums.ContainsKey($n)){ Write-Host ('[ERRO] sem hash publicado: '+$n); $ok=$false; continue }; $h=(Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash; if($h -ne $sums[$n]){ Write-Host ('[ERRO] hash diferente: '+$n); $ok=$false } }; if(-not $ok){ exit 1 }"
+if errorlevel 1 set "FAIL=1"
 goto :eof

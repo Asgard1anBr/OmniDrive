@@ -26,4 +26,4 @@ http.createServer((req, res) => {
     });
     res.end(data);
   });
-}).listen(PORT, () => console.log('OmniDrive dev em http://localhost:' + PORT));
+}).listen(PORT, '127.0.0.1', () => console.log('OmniDrive dev em http://localhost:' + PORT));

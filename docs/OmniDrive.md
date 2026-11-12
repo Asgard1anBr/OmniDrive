@@ -318,6 +318,13 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
 - **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
   `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
   `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v2.12.1** (2026-11-12) — **lote 2 de segurança** (companion v1.8): instalação em `%ProgramFiles%` com Python de
+  máquina (o companion roda elevado; pasta gravável pelo usuário permitia trocar arquivos e ganhar admin);
+  `SHA256SUMS` gerado no deploy e conferido pelo instalador numa pasta temporária antes de copiar; `.gitattributes`
+  força CRLF nos `.bat` (estavam publicados com LF puro); actions do deploy fixadas por SHA; `dev-server.js` só em
+  127.0.0.1. Testado: instalador em `OMNI_TEST` contra 3 sites simulados (ok / arquivo adulterado / hash faltando),
+  formato `sha256sum` do Linux; rotina de busca do Python isolada (só por-usuário → usa e avisa; de máquina → prefere).
+  Não testado: winget `--scope machine` numa máquina limpa e a primeira execução do deploy com o passo novo.
 - **v2.12.0** (2026-11-12) — **lote 1 de segurança** da revisão interna. (1) XSS: os nomes dos drives nas dicas
   do Painel entravam sem `esc()` — o rótulo de volume de um drive de terceiro, vindo pelo "Ler drive", executava
   código na origem do app (confirmado e corrigido; os outros 11 campos já eram escapados). `esc()` agora aceita

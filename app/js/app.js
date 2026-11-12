@@ -16,8 +16,14 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.12.0';
+  const VERSAO = '2.12.1';
   const CHANGELOG = [
+    { v: '2.12.1', data: '2026-11-12', itens: [
+      'Companion v1.8: instala numa pasta protegida (Arquivos de Programas) e usa Python instalado para todos os usuários.',
+      'O instalador confere cada arquivo baixado (SHA-256) antes de instalar; se algo não bater, não instala nada.',
+      'Scripts do companion corrigidos para o formato de linha do Windows (evita falhas estranhas no cmd).',
+      'Para atualizar: rode o instalador do companion de novo (o atalho passa a apontar para a pasta nova).'
+    ]},
     { v: '2.12.0', data: '2026-11-12', itens: [
       'Segurança: nome de drive com código HTML (ex.: rótulo de um drive de terceiro) não é mais executado no Painel.',
       'Segurança: política de conteúdo (CSP) — o app só carrega scripts próprios e do login Google.',
@@ -211,7 +217,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.12.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.12.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [

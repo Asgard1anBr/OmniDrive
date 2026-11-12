@@ -1,5 +1,16 @@
 # Changelog — OmniDrive S.M.A.R.T. Companion
 
+## v1.8 — 2026-11-12
+- Instalador passa a instalar em `%ProgramFiles%\OmniDrive\companion` (só administrador grava) em vez de
+  `%LOCALAPPDATA%`: o companion roda elevado, e arquivo em pasta gravável pelo usuário poderia ser trocado
+  por outro programa para ganhar administrador no próximo "Sim" do UAC.
+- Instalador exige Python **para todos os usuários** (instala via winget com `--scope machine` se faltar).
+  O `iniciar-smart.bat` prefere esse Python e, se só houver o Python por-usuário, funciona mas avisa.
+- Instalador baixa para uma pasta temporária, confere cada arquivo contra o `SHA256SUMS` gerado no deploy
+  e só então copia. Se algo não conferir, não instala nada. (Protege contra download corrompido ou versões
+  misturadas; não contra o site em si ser comprometido — isso exigiria assinatura de código.)
+- Scripts `.bat` agora publicados com CRLF (`.gitattributes`): com LF puro o cmd pode errar saltos de rótulo.
+
 ## v1.7 — 2026-11-12
 - Segurança: recusa (403) qualquer pedido cujo cabeçalho `Host` não seja `127.0.0.1:<porta>`,
   `localhost:<porta>` ou `[::1]:<porta>`. Protege contra DNS rebinding (site malicioso que aponta o

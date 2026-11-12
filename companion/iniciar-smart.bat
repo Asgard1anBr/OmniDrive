@@ -32,6 +32,11 @@ if not defined PYEXE (
     exit /b 1
 )
 echo [OK] Python: !PYEXE!
+if defined PY_USUARIO (
+    echo [AVISO] Este Python fica numa pasta do usuario e esta rodando como
+    echo         administrador. Para mais seguranca, rode o instalador do
+    echo         companion de novo: ele instala o Python para todos os usuarios.
+)
 
 :: --- smartctl ---
 where smartctl >nul 2>&1
@@ -60,6 +65,12 @@ exit /b
 :: ===== sub-rotina: encontra o caminho completo do python.exe =====
 :findpy
 set "PYEXE="
+set "PY_USUARIO="
+:: 0) Preferido: Python instalado para todos os usuarios (pasta protegida - o companion roda como admin)
+for /d %%d in ("%ProgramFiles%\Python3*") do if exist "%%d\python.exe" set "PYEXE=%%d\python.exe"
+if defined PYEXE goto :eof
+:: Daqui para baixo: Python por-usuario (compatibilidade). Funciona, mas e marcado para aviso.
+set "PY_USUARIO=1"
 :: 1) Python Launcher (retorna o executavel real, nao o atalho da Store)
 for /f "delims=" %%p in ('py -3 -c "import sys;print(sys.executable)" 2^>nul') do set "PYEXE=%%p"
 :: 2) python no PATH (idem)
@@ -67,6 +78,5 @@ if not defined PYEXE for /f "delims=" %%p in ('python -c "import sys;print(sys.e
 :: 3) Busca direta (funciona mesmo elevado, quando o PATH do usuario nao vem junto)
 if not defined PYEXE if exist "%LOCALAPPDATA%\Python" for /f "delims=" %%p in ('dir /b /s "%LOCALAPPDATA%\Python\pythoncore-*\python.exe" 2^>nul') do set "PYEXE=%%p"
 if not defined PYEXE if exist "%LOCALAPPDATA%\Programs\Python" for /f "delims=" %%p in ('dir /b /s "%LOCALAPPDATA%\Programs\Python\python.exe" 2^>nul') do set "PYEXE=%%p"
-if not defined PYEXE if exist "%ProgramFiles%\Python313\python.exe" set "PYEXE=%ProgramFiles%\Python313\python.exe"
-if not defined PYEXE if exist "%ProgramFiles%\Python312\python.exe" set "PYEXE=%ProgramFiles%\Python312\python.exe"
+if not defined PYEXE set "PY_USUARIO="
 goto :eof

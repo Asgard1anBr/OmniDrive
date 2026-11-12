@@ -1,0 +1,3 @@
+# Scripts .bat precisam de CRLF: com LF puro o cmd do Windows pode errar saltos (goto / call :rotina).
+*.bat text eol=crlf
+*.cmd text eol=crlf
