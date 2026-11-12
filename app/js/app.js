@@ -16,8 +16,12 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.12.1';
+  const VERSAO = '2.12.2';
   const CHANGELOG = [
+    { v: '2.12.2', data: '2026-11-12', itens: [
+      'Bastidores: verificação automática antes de cada publicação (se algo de segurança quebrar, a versão não vai ao ar).',
+      'Documentação do projeto e do modelo de segurança atualizadas.'
+    ]},
     { v: '2.12.1', data: '2026-11-12', itens: [
       'Companion v1.8: instala numa pasta protegida (Arquivos de Programas) e usa Python instalado para todos os usuários.',
       'O instalador confere cada arquivo baixado (SHA-256) antes de instalar; se algo não bater, não instala nada.',
@@ -217,7 +221,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.12.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.12.2', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [

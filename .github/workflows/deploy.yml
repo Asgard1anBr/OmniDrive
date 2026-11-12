@@ -10,7 +10,17 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
+  # Barreira: sintaxe, CSP, regressão de XSS, Host do companion, versão e CRLF.
+  # Se falhar, nada é publicado. (O teste do instalador .bat só roda no Windows.)
+  verificar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: python3 tools/verificar.py
   deploy:
+    needs: verificar
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

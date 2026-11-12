@@ -318,6 +318,10 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
 - **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
   `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
   `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v2.12.2** (2026-11-12) — **lote 3 (qualidade)**: `tools/verificar.py` (sintaxe, CSP, regressão de XSS, Host do
+  companion, instalador ok/adulterado, pontos de versão, CRLF), sem dependências; também é job `verificar` no CI, com o
+  deploy dependente dele. Provado: reintroduzir o XSS faz o script falhar. `CLAUDE.md` reescrito (estava em v1.0) e
+  `SECURITY.md` com o modelo de ameaça por funcionalidade.
 - **v2.12.1** (2026-11-12) — **lote 2 de segurança** (companion v1.8): instalação em `%ProgramFiles%` com Python de
   máquina (o companion roda elevado; pasta gravável pelo usuário permitia trocar arquivos e ganhar admin);
   `SHA256SUMS` gerado no deploy e conferido pelo instalador numa pasta temporária antes de copiar; `.gitattributes`
