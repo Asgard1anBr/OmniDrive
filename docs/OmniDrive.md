@@ -318,6 +318,12 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
 - **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
   `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
   `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v2.11.1** (2026-11-12) — **Windows bloqueando o instalador do companion.** Um `.bat` baixado pelo navegador recebe
+  a marca de internet (Zone.Identifier) e cai no SmartScreen / bloqueio de download. Verificado: arquivo baixado por
+  `Invoke-WebRequest` **não** recebe essa marca. O guia do companion ganhou a seção "O Windows bloqueou o instalador?"
+  com (1) comando PowerShell gerado a partir do endereço em que o app está aberto, com botão de copiar, e
+  (2) passo a passo para "Desbloquear" nas Propriedades. Comando testado de ponta a ponta com o instalador em `OMNI_TEST`.
+  Alternativa futura (não feita): assinar o instalador com certificado de código.
 - **v2.11.0** (2026-10-09) — **"Vincular a drive existente"** em todos os cartões do Ler drive (novo, conhecido,
   bloqueado). Vincular grava só `drive.ident` (+ `smart`/`modelo`/`serial` reais) sem ler o conteúdo, então
   funciona com BitLocker bloqueado (o serial do HD segue legível); "Vincular e atualizar conteúdo" encadeia o diff.

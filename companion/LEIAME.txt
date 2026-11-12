@@ -26,8 +26,20 @@ COMPUTADOR NOVO? USE O INSTALADOR (jeito mais fácil)
    Companion" na Área de Trabalho.
 3. Para usar: abra o atalho e deixe a janela preta aberta.
 4. Para ATUALIZAR o companion no futuro: rode o instalador de novo.
-O Windows/navegador pode avisar por ser um arquivo .bat: escolha
-"Manter" / "Executar mesmo assim". Só funciona em Windows.
+Só funciona em Windows.
+
+O WINDOWS BLOQUEOU O INSTALADOR?
+O Windows desconfia de arquivos .bat baixados pelo navegador. Duas saídas:
+  A) PowerShell (mais garantido): aperte Windows + X, escolha "Terminal",
+     cole o comando abaixo e aperte Enter. O PowerShell baixa o instalador
+     sem a marca de "veio da internet", então o Windows não bloqueia.
+
+     $f="$env:TEMP\instalar-companion.bat"; iwr "https://asgard1anbr.github.io/OmniDrive/companion/instalar-companion.bat" -OutFile $f; & $f
+
+  B) Liberar o arquivo já baixado: botão direito em instalar-companion.bat
+     -> Propriedades -> marque "Desbloquear" -> OK. Se aparecer "O Windows
+     protegeu o computador": "Mais informações" -> "Executar assim mesmo".
+Se o navegador barrar o download, abra a lista de downloads e escolha "Manter".
 
 Se preferir instalar à mão, siga as seções abaixo.
 

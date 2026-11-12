@@ -16,8 +16,13 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.11.0';
+  const VERSAO = '2.11.1';
   const CHANGELOG = [
+    { v: '2.11.1', data: '2026-11-12', itens: [
+      'Guia do companion: nova seção "O Windows bloqueou o instalador?" com duas saídas.',
+      'Opção 1: comando para colar no PowerShell (com botão de copiar) — o Windows não bloqueia esse caminho.',
+      'Opção 2: passo a passo para desbloquear o arquivo baixado (Propriedades → Desbloquear).'
+    ]},
     { v: '2.11.0', data: '2026-10-09', itens: [
       'Ler drive: botão "Vincular a drive existente" em todos os cartões (novo, conhecido e bloqueado).',
       'Vincular grava só a identidade do disco no drive escolhido, sem ler o conteúdo — funciona até com o BitLocker bloqueado. Opção "Vincular e atualizar conteúdo" quando o drive está liberado.',
@@ -200,7 +205,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.11.0', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.11.1', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -1530,11 +1535,40 @@
         <li>Para usar: abra o atalho e deixe a janela preta aberta. Depois, toque em <b>Ler drive</b>.</li>
       </ol>
       <div class="cp-dl"><a class="btn" href="companion/instalar-companion.bat" download="instalar-companion.bat">⬇ Baixar instalador</a></div>
-      <div class="cp-note">O Windows ou o navegador podem avisar por ser um arquivo .bat — escolha <b>Manter</b> / <b>Executar mesmo assim</b>.<br>
-        Para atualizar o companion no futuro, rode o instalador de novo.<br>
-        Prefere instalar à mão? <a href="companion/LEIAME.txt" target="_blank" rel="noopener">Ver o passo a passo manual</a>.</div>
+      <div class="cp-note">Para atualizar o companion no futuro, rode o instalador de novo.</div>
+      <details class="cp-block">
+        <summary>O Windows bloqueou o instalador?</summary>
+        <p class="cp-why">É normal: o Windows desconfia de arquivos <b>.bat</b> baixados pelo navegador ("O Windows protegeu o computador" ou download bloqueado). O arquivo é este mesmo, sem nada escondido. Escolha o jeito mais fácil:</p>
+        <div class="cp-h">Opção 1 — Comando no PowerShell (mais garantido)</div>
+        <ol class="cp-steps">
+          <li>Aperte <b>Windows + X</b> e escolha <b>Terminal</b> (ou <b>Windows PowerShell</b>).</li>
+          <li>Copie o comando abaixo, cole no terminal e aperte <b>Enter</b>. Ele baixa o instalador por dentro do PowerShell, o que o Windows não bloqueia.</li>
+          <li>Aceite o pedido de administrador.</li>
+        </ol>
+        <pre class="cp-cmd" id="cp-cmd"></pre>
+        <div class="cp-dl"><button type="button" class="btn ghost" id="cp-copiar">📋 Copiar comando</button></div>
+        <div class="cp-h">Opção 2 — Liberar o arquivo já baixado</div>
+        <ol class="cp-steps">
+          <li>Na pasta Downloads, clique com o botão direito em <b>instalar-companion.bat</b> → <b>Propriedades</b>.</li>
+          <li>Na parte de baixo, marque <b>Desbloquear</b> → <b>OK</b>. Abra o arquivo de novo.</li>
+          <li>Se aparecer "O Windows protegeu o computador": <b>Mais informações</b> → <b>Executar assim mesmo</b>.</li>
+        </ol>
+        <div class="cp-note">Se o navegador barrar o download, abra a lista de downloads dele e escolha <b>Manter</b>.<br>
+          Prefere instalar à mão? <a href="companion/LEIAME.txt" target="_blank" rel="noopener">Ver o passo a passo manual</a>.</div>
+      </details>
       <div class="form-actions" style="margin-top:14px"><button class="btn ghost" id="cp-fechar">Fechar</button></div>
     </div>`);
+    // O link vem do endereço em que o app está aberto (funciona em produção e em teste local).
+    const urlInst = new URL('companion/instalar-companion.bat', location.href).href;
+    const cmd = `$f="$env:TEMP\\instalar-companion.bat"; iwr "${urlInst}" -OutFile $f; & $f`;
+    m.querySelector('#cp-cmd').textContent = cmd;
+    m.querySelector('#cp-copiar').onclick = async () => {
+      try { await navigator.clipboard.writeText(cmd); toast('Comando copiado'); }
+      catch (e) { // sem permissão de área de transferência: seleciona o texto para copiar com Ctrl+C
+        const r = document.createRange(); r.selectNodeContents(m.querySelector('#cp-cmd'));
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selecionado — aperte Ctrl+C');
+      }
+    };
     m.querySelector('#cp-fechar').onclick = () => m.remove();
   }
 

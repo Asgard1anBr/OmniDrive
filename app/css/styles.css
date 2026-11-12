@@ -364,6 +364,10 @@ select.field option{background:#0b1a26;color:#fff;}
 .cp-h{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--txt-soft);margin:14px 0 4px;}
 .cp-dl{display:flex;justify-content:center;margin:14px 0 6px;}
 .cp-dl a.btn{flex:none;text-decoration:none;display:inline-block;padding:12px 26px;}
+.cp-block{margin:12px 0 4px;border:1px solid var(--line);border-radius:10px;padding:2px 12px 10px;background:rgba(0,0,0,.14);}
+.cp-block summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--warn);padding:10px 0 6px;}
+.cp-cmd{margin:8px 0 4px;padding:10px 12px;border-radius:8px;background:#050c13;border:1px solid var(--line);color:var(--cyan-lt);
+  font:12px/1.5 Consolas,Menlo,monospace;white-space:pre-wrap;word-break:break-all;user-select:all;}
 .cp-note{font-size:11px;color:var(--txt-soft);line-height:1.5;text-align:center;}
 .cp-note a{color:var(--cyan-lt);}
 .ld-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0;background:rgba(0,0,0,.18);}
