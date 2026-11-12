@@ -318,6 +318,15 @@ Texto da tela "Sobre" (rascunho — ajustar com o Davi):
 - **v1.0.3** (2026-07-12) — hipótese blur: modal do scanner sem `backdrop-filter` (classe `.scan`) + diagnóstico
   `videoWidth=0` na tela. SW `v5→v6`. Tela preta persistiu **sem** o aviso 0×0 → câmera entrega frames; é o
   `<video>` que não renderiza (bug de compositing em GPUs Android).
+- **v2.12.0** (2026-11-12) — **lote 1 de segurança** da revisão interna. (1) XSS: os nomes dos drives nas dicas
+  do Painel entravam sem `esc()` — o rótulo de volume de um drive de terceiro, vindo pelo "Ler drive", executava
+  código na origem do app (confirmado e corrigido; os outros 11 campos já eram escapados). `esc()` agora aceita
+  não-string e escapa `'`. (2) CSP por `<meta>` (o Pages não envia cabeçalhos): scripts só próprios + GIS; o
+  registro do SW foi para `js/sw-register.js` e os handlers inline do campo de aquisição viraram
+  `addEventListener`. (3) Companion v1.7 valida `Host` (DNS rebinding). (4) `.gitignore` cobre instaladores,
+  PNGs da raiz e `aprendizados__*.md`. Testado localmente: login GIS carrega, Ler drive, relatório, QR/PNG,
+  campo de data e guia sem nenhuma violação de CSP. Limitação: o navegador de testes não registra Service
+  Worker em nenhuma versão (também na anterior), então o SW sob CSP só se confirma em produção.
 - **v2.11.1** (2026-11-12) — **Windows bloqueando o instalador do companion.** Um `.bat` baixado pelo navegador recebe
   a marca de internet (Zone.Identifier) e cai no SmartScreen / bloqueio de download. Verificado: arquivo baixado por
   `Invoke-WebRequest` **não** recebe essa marca. O guia do companion ganhou a seção "O Windows bloqueou o instalador?"

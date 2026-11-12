@@ -1,5 +1,10 @@
 # Changelog — OmniDrive S.M.A.R.T. Companion
 
+## v1.7 — 2026-11-12
+- Segurança: recusa (403) qualquer pedido cujo cabeçalho `Host` não seja `127.0.0.1:<porta>`,
+  `localhost:<porta>` ou `[::1]:<porta>`. Protege contra DNS rebinding (site malicioso que aponta o
+  próprio domínio para 127.0.0.1 para ler nomes de arquivos via `/scan`; o CORS sozinho não impede).
+
 ## v1.6 — 2026-10-09
 - Novo `instalar-companion.bat`: instalador de um clique para máquinas novas. Instala Python e smartmontools
   via winget se faltarem, baixa o companion do próprio site do OmniDrive para `%LOCALAPPDATA%\OmniDrive\companion`

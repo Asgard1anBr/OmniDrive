@@ -16,8 +16,14 @@
   const TIPOS_ARQUIVO = Object.keys(LABELS.tiposArquivo);
 
   // ---------- versão e histórico ----------
-  const VERSAO = '2.11.1';
+  const VERSAO = '2.12.0';
   const CHANGELOG = [
+    { v: '2.12.0', data: '2026-11-12', itens: [
+      'Segurança: nome de drive com código HTML (ex.: rótulo de um drive de terceiro) não é mais executado no Painel.',
+      'Segurança: política de conteúdo (CSP) — o app só carrega scripts próprios e do login Google.',
+      'Segurança: o companion v1.7 recusa pedidos que não venham do endereço local (proteção contra DNS rebinding).',
+      'Campo de aquisição continua abrindo o calendário, agora sem código embutido no HTML.'
+    ]},
     { v: '2.11.1', data: '2026-11-12', itens: [
       'Guia do companion: nova seção "O Windows bloqueou o instalador?" com duas saídas.',
       'Opção 1: comando para colar no PowerShell (com botão de copiar) — o Windows não bloqueia esse caminho.',
@@ -205,7 +211,7 @@
 
   // ---------- dados de exemplo (semente) ----------
   const SEED = {
-    schemaVersion: 1, appVersion: '2.11.1', app: 'OmniDrive',
+    schemaVersion: 1, appVersion: '2.12.0', app: 'OmniDrive',
     atualizadoEm: new Date().toISOString(),
     locais: ['Gaveta 2', 'Estante 1', 'Chaveiro'],
     drives: [
@@ -287,7 +293,7 @@
     return Math.max(0, Math.min(100, Math.round((d.usadoGB / d.capacidadeGB) * 100)));
   }
   function pctColor(pct) { return pct >= 90 ? 'var(--danger)' : pct >= 75 ? 'var(--warn)' : 'var(--cyan)'; }
-  function esc(s) { return (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
   // divide o conteúdo (texto livre) em itens por vírgula / quebra de linha
   function splitConteudo(txt) {
@@ -555,13 +561,13 @@
     const tips = [];
     const subutilizados = drives.filter(d => usoPct(d) != null && usoPct(d) < 20);
     if (subutilizados.length >= 2) {
-      const nomes = subutilizados.slice(0, 3).map(d => d.nome).join(', ');
+      const nomes = subutilizados.slice(0, 3).map(d => esc(d.nome)).join(', '); // nome pode vir do rótulo de um drive de terceiro
       const capLivre = subutilizados.reduce((s, d) => s + (d.capacidadeGB || 0) - (d.usadoGB || 0), 0);
       tips.push(`<b>💡 Consolidação possível:</b> ${subutilizados.length} drives com menos de 20% de uso (${nomes}). Juntos liberam ${fmtGB(capLivre)}.`);
     }
     const cheios = drives.filter(d => usoPct(d) != null && usoPct(d) >= 90);
     if (cheios.length) {
-      tips.push(`<b>⚠️ ${cheios.length} drive(s) acima de 90%:</b> ${cheios.map(d => d.nome).join(', ')}. Considere fazer backup ou migrar dados.`);
+      tips.push(`<b>⚠️ ${cheios.length} drive(s) acima de 90%:</b> ${cheios.map(d => esc(d.nome)).join(', ')}. Considere fazer backup ou migrar dados.`);
     }
     const semLocal = drives.filter(d => !d.local);
     if (semLocal.length) {
@@ -1044,7 +1050,7 @@
       </div>
 
       <label class="flabel">Aquisição <em>opcional</em></label>
-      <input class="field" id="f-aquisicao" type="${d.aquisicao ? 'month' : 'text'}" value="${esc(d.aquisicao || '')}" placeholder=" " readonly onfocus="this.type='month';this.removeAttribute('readonly');this.showPicker?.()" onchange="this.classList.toggle('month-filled',!!this.value)">
+      <input class="field" id="f-aquisicao" type="${d.aquisicao ? 'month' : 'text'}" value="${esc(d.aquisicao || '')}" placeholder=" " readonly>
 
       <label class="flabel">Tipos de arquivo</label>
       ${pillHtml('f-tipos', LABELS.tiposArquivo, d.tiposArquivo || [])}
@@ -1096,6 +1102,12 @@
     echoParse(capEl.value, eCap); updUso(); // eco inicial (modo edição)
 
     el.querySelector('#add-local').addEventListener('click', () => abrirNovoLocal(el.querySelector('#f-local')));
+    const aquis = el.querySelector('#f-aquisicao');
+    aquis.addEventListener('focus', () => {
+      aquis.removeAttribute('readonly');
+      if (aquis.type !== 'month') { aquis.type = 'month'; try { aquis.showPicker?.(); } catch (e) {} }
+    });
+    aquis.addEventListener('change', () => aquis.classList.toggle('month-filled', !!aquis.value));
     el.querySelector('#cancelar').addEventListener('click', () => { state.editId = null; state.draft = null; go('busca'); });
     const rem = el.querySelector('#remover'); if (rem) rem.addEventListener('click', () => confirmarRemover(d));
     function smartApply(picked) {

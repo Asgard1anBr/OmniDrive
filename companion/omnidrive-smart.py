@@ -34,7 +34,7 @@ except Exception:
     pass
 
 PORT = int(os.environ.get('OMNIDRIVE_PORT', 7777))
-COMPANION_VERSION = '1.6'
+COMPANION_VERSION = '1.7'
 
 import threading
 import shutil
@@ -323,6 +323,20 @@ def scan_tree(root, root_label, max_depth=3):
 
 
 class SmartHandler(http.server.BaseHTTPRequestHandler):
+    def _host_ok(self):
+        # Defesa contra DNS rebinding: um site malicioso pode fazer o próprio domínio apontar
+        # para 127.0.0.1 e virar "mesma origem" (o CORS não ajuda). Só aceitamos o nome local.
+        host = (self.headers.get('Host') or '').strip().lower()
+        return host in {f'127.0.0.1:{PORT}', f'localhost:{PORT}', f'[::1]:{PORT}'}
+
+    def _negar_host(self):
+        body = b'{"ok": false, "error": "Host nao permitido"}'
+        self.send_response(403)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _cors(self):
         origin = self.headers.get('Origin') or ''
         if origin and ALLOWED_ORIGIN_RE.match(origin):
@@ -342,6 +356,8 @@ class SmartHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if not self._host_ok():
+            return self._negar_host()
         u = urlparse(self.path)
         q = parse_qs(u.query)
         try:
@@ -387,6 +403,8 @@ class SmartHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'ok': False, 'error': 'Rota desconhecida'}).encode())
 
     def do_OPTIONS(self):
+        if not self._host_ok():
+            return self._negar_host()
         self.send_response(204)
         self._cors()
         self.end_headers()

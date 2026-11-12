@@ -2,3 +2,13 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# instaladores baixados e soltos na raiz (grandes; nunca publicar)
+*.msix
+*-setup.exe
+*.exe
+# relatórios internos / aprendizados (repositório é público)
+aprendizados__*.md
+# imagens-fonte soltas na raiz (as usadas pelo app ficam em app/)
+/*.png
+__pycache__/
